@@ -1,0 +1,1678 @@
+<title>BRS Workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#F5F3EC;
+    --surface:#FFFFFE;
+    --surface-2:#EEEAE0;
+    --ink:#1E2430;
+    --ink-dim:#5B5F6B;
+    --line:#DAD4C4;
+    --line-strong:#C2BBA6;
+    --accent:#2B3F6B;
+    --accent-ink:#F5F3EC;
+    --accent-soft:#DCE2EF;
+    --gold:#8C6A22;
+    --gold-soft:#EFE3C4;
+    --ok:#276A4E;
+    --ok-soft:#DCEEE3;
+    --warn:#93650F;
+    --warn-soft:#F5E7C6;
+    --bad:#A23F2C;
+    --bad-soft:#F6DFD6;
+    --shadow: 0 1px 2px rgba(30,36,48,.06), 0 6px 20px -8px rgba(30,36,48,.18);
+    --radius: 10px;
+    --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --font-body: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#12151C;
+      --surface:#181C25;
+      --surface-2:#1F2430;
+      --ink:#E8E6DD;
+      --ink-dim:#9AA0AE;
+      --line:#2B3040;
+      --line-strong:#3A4053;
+      --accent:#8CA0D6;
+      --accent-ink:#12151C;
+      --accent-soft:#232A40;
+      --gold:#D6B36B;
+      --gold-soft:#332A16;
+      --ok:#5FBE93;
+      --ok-soft:#173226;
+      --warn:#E0B24E;
+      --warn-soft:#332A11;
+      --bad:#E17F63;
+      --bad-soft:#37201A;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -10px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#12151C;
+    --surface:#181C25;
+    --surface-2:#1F2430;
+    --ink:#E8E6DD;
+    --ink-dim:#9AA0AE;
+    --line:#2B3040;
+    --line-strong:#3A4053;
+    --accent:#8CA0D6;
+    --accent-ink:#12151C;
+    --accent-soft:#232A40;
+    --gold:#D6B36B;
+    --gold-soft:#332A16;
+    --ok:#5FBE93;
+    --ok-soft:#173226;
+    --warn:#E0B24E;
+    --warn-soft:#332A11;
+    --bad:#E17F63;
+    --bad-soft:#37201A;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -10px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-size:14px;
+    line-height:1.5;
+    font-variant-numeric: tabular-nums;
+  }
+  .num{ font-variant-numeric: tabular-nums; }
+  ::selection{ background:var(--accent-soft); }
+
+  a{ color:var(--accent); }
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:28px 24px 80px; }
+
+  /* ---------- Header ---------- */
+  .masthead{
+    display:flex; align-items:baseline; justify-content:space-between; gap:24px;
+    padding-bottom:18px; margin-bottom:22px; border-bottom:2px solid var(--ink);
+    flex-wrap:wrap;
+  }
+  .masthead h1{
+    font-family:var(--font-display); font-weight:600; font-size:28px; margin:0;
+    text-wrap:balance; letter-spacing:-0.01em;
+  }
+  .masthead .tag{
+    font-size:12px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.09em;
+    margin-top:4px;
+  }
+  .masthead .privacy{
+    font-size:12.5px; color:var(--ink-dim); max-width:320px; text-align:right;
+    display:flex; align-items:center; gap:7px; justify-content:flex-end;
+  }
+  .privacy .dot{ width:7px; height:7px; border-radius:50%; background:var(--ok); flex:none; box-shadow:0 0 0 3px var(--ok-soft); }
+
+  /* ---------- Status bar ---------- */
+  .statusbar{
+    position:sticky; top:0; z-index:40;
+    display:flex; gap:0; align-items:stretch;
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); margin-bottom:26px; overflow:hidden;
+  }
+  .statusbar .cell{
+    flex:1; padding:12px 18px; border-right:1px solid var(--line);
+    display:flex; flex-direction:column; gap:2px; justify-content:center; min-width:0;
+  }
+  .statusbar .cell:last-child{ border-right:none; }
+  .statusbar .label{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-dim); }
+  .statusbar .value{ font-size:19px; font-weight:600; font-family:var(--font-mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .statusbar .cell.balanced{ background:var(--ok-soft); }
+  .statusbar .cell.balanced .value{ color:var(--ok); }
+  .statusbar .cell.variance{ background:var(--bad-soft); }
+  .statusbar .cell.variance .value{ color:var(--bad); }
+
+  /* ---------- Section shell ---------- */
+  section.block{ margin-bottom:34px; }
+  .block-head{ display:flex; align-items:baseline; gap:12px; margin-bottom:14px; }
+  .step-no{
+    font-family:var(--font-display); font-size:14px; font-weight:600;
+    color:var(--accent-ink); background:var(--accent);
+    width:24px; height:24px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; flex:none;
+  }
+  .block-head h2{ font-family:var(--font-display); font-weight:600; font-size:19px; margin:0; }
+  .block-head .sub{ color:var(--ink-dim); font-size:13px; margin-left:auto; text-align:right; }
+
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px 20px; box-shadow:var(--shadow);
+  }
+
+  /* ---------- Form grid ---------- */
+  .formgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px 16px; }
+  .formgrid .field.span2{ grid-column:span 2; }
+  .formgrid .field.span4{ grid-column:span 4; }
+  @media (max-width:820px){ .formgrid{ grid-template-columns:repeat(2,1fr);} }
+  .field label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-dim); margin-bottom:5px; }
+  .field input, .field select{
+    width:100%; padding:8px 10px; border:1px solid var(--line-strong); border-radius:7px;
+    background:var(--paper); color:var(--ink); font:inherit; font-size:13.5px;
+  }
+  .field input:focus, .field select:focus, button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--accent); outline-offset:1px;
+  }
+
+  /* ---------- Two column upload ---------- */
+  .twocol{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  .twocol > .card{ min-width:0; }
+  @media (max-width:900px){ .twocol{ grid-template-columns:1fr; } }
+  .panel-title{ font-weight:600; font-size:14.5px; margin:0 0 3px; }
+  .panel-desc{ color:var(--ink-dim); font-size:12.5px; margin:0 0 12px; }
+
+  .dropzone{
+    border:1.5px dashed var(--line-strong); border-radius:8px; padding:16px;
+    display:flex; align-items:center; gap:12px; background:var(--surface-2);
+    cursor:pointer; transition:border-color .15s;
+  }
+  .dropzone:hover, .dropzone.drag{ border-color:var(--accent); }
+  .dropzone svg{ flex:none; opacity:.7; }
+  .dropzone .dz-text{ font-size:12.8px; color:var(--ink-dim); }
+  .dropzone .dz-text b{ color:var(--ink); font-weight:600; }
+  .dropzone input[type=file]{ display:none; }
+
+  .modebar{ display:flex; gap:6px; margin-bottom:10px; }
+  .modebar button{
+    font:inherit; font-size:12px; padding:6px 12px; border-radius:20px; border:1px solid var(--line-strong);
+    background:var(--surface); color:var(--ink-dim); cursor:pointer;
+  }
+  .modebar button.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+
+  .rowtools{ display:flex; gap:8px; margin:10px 0 4px; flex-wrap:wrap; }
+  .btn{
+    font:inherit; font-size:12.8px; font-weight:600; padding:7px 14px; border-radius:7px;
+    border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); cursor:pointer;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:hover{ border-color:var(--accent); color:var(--accent); }
+  .btn.primary{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  .btn.primary:hover{ filter:brightness(1.08); color:var(--accent-ink); }
+  .btn.ghost{ border-color:transparent; background:transparent; }
+  .btn.small{ padding:4px 9px; font-size:11.5px; }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn.danger:hover{ border-color:var(--bad); color:var(--bad); }
+
+  .tablewrap{ overflow-x:auto; border:1px solid var(--line); border-radius:8px; margin-top:10px; max-height:230px; overflow-y:auto; }
+  table.data{ width:100%; border-collapse:collapse; font-size:12.6px; }
+  table.data th{
+    position:sticky; top:0; background:var(--surface-2); text-align:left; font-weight:600;
+    padding:7px 9px; border-bottom:1px solid var(--line); white-space:nowrap; font-size:11px;
+    text-transform:uppercase; letter-spacing:.04em; color:var(--ink-dim);
+  }
+  table.data td{ padding:6px 9px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  table.data td.num, table.data th.num{ text-align:right; font-family:var(--font-mono); }
+  table.data tbody tr:last-child td{ border-bottom:none; }
+  table.data tbody tr.example{ color:var(--ink-dim); font-style:italic; }
+  .pill{
+    display:inline-block; padding:1px 8px; border-radius:20px; font-size:10.5px; font-weight:600;
+    letter-spacing:.03em; text-transform:uppercase;
+  }
+  .pill.example{ background:var(--gold-soft); color:var(--gold); }
+  .pill.loaded{ background:var(--ok-soft); color:var(--ok); }
+
+  .tblhead-actions{ display:flex; align-items:center; justify-content:space-between; margin-top:12px; }
+  .count{ font-size:12px; color:var(--ink-dim); }
+
+  /* manual entry table */
+  table.manual{ width:100%; border-collapse:collapse; font-size:12.6px; }
+  table.manual th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-dim); padding:6px 6px; border-bottom:1px solid var(--line); }
+  table.manual td{ padding:4px 5px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  table.manual input, table.manual select{
+    width:100%; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; font-size:12.6px;
+    padding:5px 6px; border-radius:5px;
+  }
+  table.manual input:hover, table.manual select:hover{ border-color:var(--line-strong); }
+  table.manual input:focus, table.manual select:focus{ border-color:var(--accent); outline:none; background:var(--surface); }
+  table.manual td.amt input{ text-align:right; font-family:var(--font-mono); }
+  table.manual tr.example td{ opacity:.55; font-style:italic; }
+
+  /* ---------- Results ---------- */
+  .runbar{ display:flex; justify-content:center; margin:8px 0 30px; }
+  .runbar .btn.primary{ font-size:14px; padding:12px 28px; }
+
+  .catgroup{ margin-bottom:16px; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:var(--surface); }
+  .catgroup .cathead{
+    display:flex; align-items:center; gap:10px; padding:11px 16px; background:var(--surface-2);
+    border-bottom:1px solid var(--line);
+  }
+  .catgroup .cathead .stripe{ width:4px; align-self:stretch; border-radius:3px; flex:none; }
+  .catgroup .cathead h3{ font-size:13.5px; margin:0; font-weight:600; flex:1; }
+  .catgroup .cathead .side{ font-size:11px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.05em; }
+  .catgroup .cathead .subtotal{ font-family:var(--font-mono); font-weight:700; font-size:14px; }
+  .catgroup .empty{ padding:14px 16px; color:var(--ink-dim); font-size:12.5px; font-style:italic; }
+
+  table.items{ width:100%; border-collapse:collapse; font-size:12.6px; }
+  table.items th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-dim); padding:6px 12px; border-bottom:1px solid var(--line); }
+  table.items td{ padding:5px 12px; border-bottom:1px solid var(--line); }
+  table.items tr:last-child td{ border-bottom:none; }
+  table.items tr.excluded{ opacity:.4; }
+  table.items td.num{ text-align:right; font-family:var(--font-mono); white-space:nowrap; }
+  table.items td.ref{ font-family:var(--font-mono); font-size:11.8px; color:var(--ink-dim); white-space:nowrap; }
+  table.items input.remark{ width:100%; border:1px solid transparent; background:transparent; font:inherit; font-size:12px; color:var(--ink); padding:3px 5px; border-radius:4px; }
+  table.items input.remark:hover{ border-color:var(--line-strong); }
+  table.items input.remark:focus{ border-color:var(--accent); outline:none; background:var(--surface); }
+  table.items input.amtedit{ width:96px; border:1px solid transparent; background:transparent; font:inherit; font-family:var(--font-mono); font-size:12.6px; text-align:right; padding:3px 5px; border-radius:4px; color:var(--ink); }
+  table.items input.amtedit:hover{ border-color:var(--line-strong); }
+  table.items input.amtedit:focus{ border-color:var(--accent); outline:none; background:var(--surface); }
+  .chk{ width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
+  .xbtn{ border:none; background:none; color:var(--ink-dim); cursor:pointer; font-size:15px; line-height:1; padding:2px 5px; border-radius:4px; }
+  .xbtn:hover{ color:var(--bad); background:var(--bad-soft); }
+
+  .addrow-line{ padding:8px 12px; border-top:1px dashed var(--line); }
+
+  /* balances footer */
+  .balances{
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px; background:var(--line);
+    border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; margin-top:6px;
+  }
+  .balances .col{ background:var(--surface); padding:16px 20px; min-width:0; }
+  .balances .col h4{ margin:0 0 10px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-dim); }
+  .balances .line{ display:flex; justify-content:space-between; font-size:13px; padding:3px 0; }
+  .balances .line.total{ border-top:1px solid var(--line); margin-top:6px; padding-top:8px; font-weight:700; font-size:15px; font-family:var(--font-mono); }
+  .balances .col.variance{ display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:8px; }
+  .balances .col.variance .amt{ font-family:var(--font-mono); font-size:26px; font-weight:700; }
+  .balances .col.variance.ok .amt{ color:var(--ok); }
+  .balances .col.variance.bad .amt{ color:var(--bad); }
+  .balances .col.variance .msg{ font-size:12px; color:var(--ink-dim); max-width:220px; }
+
+  /* export */
+  .exportcard{ display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+  .exportcard .info{ flex:1; min-width:220px; font-size:12.8px; color:var(--ink-dim); }
+  .toast{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:8px; font-size:13px;
+    box-shadow:var(--shadow); z-index:60; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(-4px); }
+
+  footer.credits{ text-align:center; color:var(--ink-dim); font-size:11.5px; margin-top:50px; }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>BRS Workbench</h1>
+      <div class="tag">Bank &amp; book cash reconciliation</div>
+    </div>
+    <div class="privacy"><span class="dot"></span>Files are parsed in your browser only — nothing is uploaded to a server.</div>
+  </div>
+
+  <div class="statusbar" id="statusbar">
+    <div class="cell"><span class="label">Unadjusted book</span><span class="value num" id="s-ubook">—</span></div>
+    <div class="cell"><span class="label">Unadjusted bank</span><span class="value num" id="s-ubank">—</span></div>
+    <div class="cell"><span class="label">Matched transactions</span><span class="value num" id="s-matched">—</span></div>
+    <div class="cell" id="s-variance-cell"><span class="label">Adjusted variance</span><span class="value num" id="s-variance">—</span></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <section class="block">
+    <div class="block-head">
+      <span class="step-no">1</span><h2>Account &amp; period</h2>
+    </div>
+    <div class="card">
+      <div class="formgrid" id="header-form">
+        <div class="field span4"><label for="f-account-picker">Account</label>
+          <select id="f-account-picker"></select>
+        </div>
+        <div class="field"><label for="f-org">Agency</label><input id="f-org" value="MUNICIPAL GOVERNMENT OF CANDONI"></div>
+        <div class="field"><label for="f-fund">Fund</label><input id="f-fund" value="General Fund"></div>
+        <div class="field"><label for="f-month">Month</label>
+          <select id="f-month"></select>
+        </div>
+        <div class="field"><label for="f-year">Year</label><input id="f-year" value="2026" inputmode="numeric"></div>
+
+        <div class="field"><label for="f-bank">Bank name</label><input id="f-bank" value="Land Bank of the Philippines"></div>
+        <div class="field"><label for="f-branch">Branch</label><input id="f-branch" value="Kabankalan City"></div>
+        <div class="field span2"><label for="f-acct">Account no.</label><input id="f-acct" value="1172-1020-22" style="font-family:var(--font-mono)"></div>
+
+        <div class="field span2"><label for="f-prep">Prepared by</label><input id="f-prep" value="DEMI ROSE G. TAN"></div>
+        <div class="field span2"><label for="f-cert">Certified correct by</label><input id="f-cert" value="NEIL P. PRIOLO, CPA"></div>
+
+        <div class="field span2"><label for="f-ubook">Unadjusted book balance (per general ledger)</label><input id="f-ubook" type="number" step="0.01" style="font-family:var(--font-mono)"></div>
+        <div class="field span2"><label for="f-ubank">Unadjusted bank balance <span style="text-transform:none">(auto-fills from statement)</span></label><input id="f-ubank" type="number" step="0.01" style="font-family:var(--font-mono)"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: PRIOR PERIOD OUTSTANDING ITEMS -->
+  <section class="block">
+    <div class="block-head">
+      <span class="step-no">2</span><h2>Prior period outstanding items</h2>
+      <span class="sub">Optional — carries forward last month's still-outstanding checks and deposits so they're recognized when they finally clear, not misread as bank memos</span>
+    </div>
+    <div class="card" id="prior-panel">
+      <p class="panel-title">Checks &amp; deposits still outstanding as of last month's reconciliation</p>
+      <p class="panel-desc">Upload last month's BR/Schedule workbook — the most recent "S_" schedule sheet is auto-detected — or enter the carryover items by hand. Leave this empty for a first-time reconciliation.</p>
+      <div class="modebar">
+        <button class="mode-btn active" data-pmode="upload">Upload file</button>
+        <button class="mode-btn" data-pmode="manual">Enter manually</button>
+      </div>
+
+      <div id="prior-upload-mode">
+        <label class="dropzone" id="prior-drop">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+          <span class="dz-text"><b>Click to upload</b> last month's BR workbook (.xlsx)</span>
+          <input type="file" id="prior-file" accept=".xlsx,.xls">
+        </label>
+        <div class="rowtools">
+          <button class="btn small" id="prior-example">Load example data</button>
+          <button class="btn small ghost" id="prior-clear">Clear</button>
+          <span class="pill" id="prior-pill" style="margin-left:auto">none</span>
+        </div>
+      </div>
+
+      <div id="prior-manual-mode" style="display:none">
+        <div class="tablewrap" style="max-height:none">
+          <table class="manual" id="prior-manual-table">
+            <thead><tr><th style="width:110px">Date</th><th style="width:190px">Category</th><th style="width:110px">Reference no.</th><th>Payee / description</th><th style="width:110px">Amount</th><th style="width:24px"></th></tr></thead>
+            <tbody id="prior-manual-body"></tbody>
+          </table>
+        </div>
+        <div class="rowtools"><button class="btn small" id="prior-addrow">+ Add row</button></div>
+      </div>
+
+      <div id="prior-preview-wrap"><div id="prior-groups"></div></div>
+      <div class="tblhead-actions"><span class="count" id="prior-count"></span></div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="block">
+    <div class="block-head">
+      <span class="step-no">3</span><h2>Bank statement &amp; book records</h2>
+      <span class="sub">Upload the exports for this account and this month</span>
+    </div>
+
+    <div class="twocol">
+      <!-- BANK PANEL -->
+      <div class="card" id="bank-panel">
+        <p class="panel-title">Bank statement</p>
+        <p class="panel-desc">Columns expected: Date, Description, Debit, Credit, Balance, Cheque Number — the format your bank export already uses.</p>
+        <label class="dropzone" id="bank-drop">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+          <span class="dz-text"><b>Click to upload</b> or drag an .xlsx / .csv file here</span>
+          <input type="file" id="bank-file" accept=".xlsx,.xls,.csv">
+        </label>
+        <div class="rowtools">
+          <button class="btn small" id="bank-example">Load example data</button>
+          <button class="btn small ghost" id="bank-clear">Clear</button>
+          <span class="pill example" id="bank-pill" style="margin-left:auto">example</span>
+        </div>
+        <div class="tablewrap"><table class="data" id="bank-table"><thead></thead><tbody></tbody></table></div>
+        <div class="tblhead-actions"><span class="count" id="bank-count"></span><span class="count num" id="bank-endbal"></span></div>
+      </div>
+
+      <!-- BOOK PANEL -->
+      <div class="card" id="book-panel">
+        <p class="panel-title">Book records</p>
+        <p class="panel-desc">Your account ledger export (TransDate / TransType / ReferenceNumber / Payee / Debit / Credit), a WP working paper, or a simple register.</p>
+        <div class="modebar">
+          <button class="mode-btn active" data-mode="upload">Upload file</button>
+          <button class="mode-btn" data-mode="manual">Enter manually</button>
+        </div>
+
+        <div id="book-upload-mode">
+          <label class="dropzone" id="book-drop">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+            <span class="dz-text"><b>Click to upload</b> your ledger export, WP working paper, or register (.xlsx / .csv)</span>
+            <input type="file" id="book-file" accept=".xlsx,.xls,.csv">
+          </label>
+          <div class="rowtools">
+            <button class="btn small" id="book-example">Load example data</button>
+            <button class="btn small ghost" id="book-clear">Clear</button>
+            <span class="pill example" id="book-pill" style="margin-left:auto">example</span>
+          </div>
+        </div>
+
+        <div id="book-manual-mode" style="display:none">
+          <div class="tablewrap" style="max-height:none">
+            <table class="manual" id="book-manual-table">
+              <thead><tr><th style="width:110px">Date</th><th style="width:150px">Type</th><th style="width:110px">Reference no.</th><th>Payee / description</th><th style="width:110px">Amount</th><th style="width:24px"></th></tr></thead>
+              <tbody id="book-manual-body"></tbody>
+            </table>
+          </div>
+          <div class="rowtools"><button class="btn small" id="book-addrow">+ Add row</button></div>
+        </div>
+
+        <div class="tablewrap" id="book-preview-wrap"><table class="data" id="book-table"><thead></thead><tbody></tbody></table></div>
+        <div class="tblhead-actions"><span class="count" id="book-count"></span></div>
+      </div>
+    </div>
+
+    <div class="runbar">
+      <button class="btn primary" id="run-btn">Run reconciliation →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: RESULTS -->
+  <section class="block" id="results-block" style="display:none">
+    <div class="block-head">
+      <span class="step-no">4</span><h2>Reconciling items</h2>
+      <span class="sub">Auto-matched by reference no., batched ADA/deposit groups, then amount clusters · edit, exclude, or add items freely</span>
+    </div>
+    <div id="cat-groups"></div>
+
+    <div class="balances" id="balances-block">
+      <div class="col" id="book-col">
+        <h4>Adjusted book balance</h4>
+        <div id="book-lines"></div>
+      </div>
+      <div class="col" id="bank-col">
+        <h4>Adjusted bank balance</h4>
+        <div id="bank-lines"></div>
+      </div>
+      <div class="col variance" id="variance-col">
+        <span class="label" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim)">Variance</span>
+        <span class="amt num" id="variance-amt">—</span>
+        <span class="msg" id="variance-msg"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 4: EXPORT -->
+  <section class="block" id="export-block" style="display:none">
+    <div class="block-head">
+      <span class="step-no">5</span><h2>Export</h2>
+    </div>
+    <div class="card exportcard">
+      <div class="info">Generates two sheets — <b>BR_<span id="exp-tag1"></span></b> (statement) and <b>S_<span id="exp-tag2"></span></b> (schedules) — in the layout of your existing workbook, ready to paste in or send as-is.</div>
+      <button class="btn primary" id="export-btn">Download BRS workbook (.xlsx)</button>
+    </div>
+  </section>
+
+  <footer class="credits">BRS Workbench · built for Mgocandoniaccounting · runs entirely client-side</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var monthSel = document.getElementById('f-month');
+  MONTHS.forEach(function(m,i){ var o=document.createElement('option'); o.value=m; o.textContent=m; if(i===0)o.selected=true; monthSel.appendChild(o); });
+  // Downloaded filename tag: zero-padded month number + 3-letter month + year,
+  // e.g. "01Jan2026", "02Feb2026" — sorts correctly by filename, unlike a
+  // bare month-name tag.
+  function monthTag(month, year){
+    var idx = MONTHS.indexOf(month);
+    var mm = idx>-1? String(idx+1).padStart(2,'0') : '';
+    return mm+(month||'').slice(0,3)+year;
+  }
+
+  // ---------------------------------------------------------------
+  // THE LGU'S 13 BANK ACCOUNTS — pick one to auto-fill fund, bank & account
+  // no. instead of retyping them every month. Account numbers are formatted
+  // with the same 4-4-2 dashing as the pilot LBP account where the digit
+  // count matches (10 digits); DBP/PPSB numbers are shown as issued since
+  // there's no confirmed dash convention for those.
+  // ---------------------------------------------------------------
+  var FUND_NAMES = {GF:'General Fund', SF:'Special Education Fund', TF:'Trust Fund'};
+  var BANK_NAMES = {LBP:'Land Bank of the Philippines', DBP:'Development Bank of the Philippines', PPSB:'Philippine Postal Savings Bank'};
+  function dashAcct(digits){
+    return digits.length===10? (digits.slice(0,4)+'-'+digits.slice(4,8)+'-'+digits.slice(8)) : digits;
+  }
+  var ACCOUNTS = [
+    {key:'GF_LBP_1172102022', fundCode:'GF', bankCode:'LBP', digits:'1172102022', status:''},
+    {key:'GF_LBP_1172108381', fundCode:'GF', bankCode:'LBP', digits:'1172108381', status:''},
+    {key:'SF_LBP_1172101000', fundCode:'SF', bankCode:'LBP', digits:'1172101000', status:''},
+    {key:'TF_LBP_1172100810', fundCode:'TF', bankCode:'LBP', digits:'1172100810', status:''},
+    {key:'TF_LBP_1172107121', fundCode:'TF', bankCode:'LBP', digits:'1172107121', status:''},
+    {key:'TF_LBP_1172107130', fundCode:'TF', bankCode:'LBP', digits:'1172107130', status:''},
+    {key:'GF_DBP_000055977454', fundCode:'GF', bankCode:'DBP', digits:'000055977454', status:'DORMANT'},
+    {key:'GF_DBP_005122327459', fundCode:'GF', bankCode:'DBP', digits:'005122327459', status:'DORMANT'},
+    {key:'SF_LBP_1172105633', fundCode:'SF', bankCode:'LBP', digits:'1172105633', status:'CLOSED'},
+    {key:'TF_LBP_1172105803', fundCode:'TF', bankCode:'LBP', digits:'1172105803', status:'CLOSED'},
+    {key:'TF_LBP_1172107245', fundCode:'TF', bankCode:'LBP', digits:'1172107245', status:'CLOSED'},
+    {key:'TF_LBP_1172108322', fundCode:'TF', bankCode:'LBP', digits:'1172108322', status:'INACTIVE'},
+    {key:'TF_PPSB_060110700752', fundCode:'TF', bankCode:'PPSB', digits:'060110700752', status:'DORMANT'}
+  ].map(function(a){
+    return Object.assign({}, a, {fund:FUND_NAMES[a.fundCode], bank:BANK_NAMES[a.bankCode], acct:dashAcct(a.digits)});
+  });
+  var acctSel = document.getElementById('f-account-picker');
+  (function(){
+    var placeholder = document.createElement('option');
+    placeholder.value=''; placeholder.textContent='— Select an account to auto-fill fund, bank & account no. —';
+    acctSel.appendChild(placeholder);
+    var active = document.createElement('optgroup'); active.label='Active accounts';
+    var inactive = document.createElement('optgroup'); inactive.label='Dormant / closed / inactive accounts';
+    ACCOUNTS.forEach(function(a){
+      var o = document.createElement('option');
+      o.value = a.key;
+      o.textContent = a.fund+' — '+a.bank+' ('+a.acct+')'+(a.status? ' — '+a.status : '');
+      (a.status? inactive : active).appendChild(o);
+    });
+    acctSel.appendChild(active); acctSel.appendChild(inactive);
+  })();
+  acctSel.addEventListener('change', function(){
+    var a = ACCOUNTS.find(function(x){ return x.key===acctSel.value; });
+    if(!a) return;
+    document.getElementById('f-fund').value = a.fund;
+    document.getElementById('f-bank').value = a.bank;
+    document.getElementById('f-acct').value = a.acct;
+    saveHeaderPrefs();
+    if(state.items.length) renderResults();
+    if(a.status) toast('Note: this account is marked '+a.status+'.');
+  });
+  acctSel.value = 'GF_LBP_1172102022'; // matches this workbench's pilot account defaults below
+
+  function fmt(n){
+    if(n===null||n===undefined||isNaN(n)) return '—';
+    var neg = n < -0.004;
+    var v = Math.abs(n);
+    var s = v.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+    return (neg? '(':'') + '₱' + s + (neg? ')':'');
+  }
+  function round2(n){ return Math.round((n+Number.EPSILON)*100)/100; }
+  function toast(msg){
+    var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+    clearTimeout(toast._h); toast._h=setTimeout(function(){t.classList.remove('show');},2600);
+  }
+  // Dates carry no meaningful time-of-day for a bank/book record, so every
+  // Date object in this app is treated as a plain calendar day: built and
+  // read using LOCAL getters/constructors throughout (never UTC). This has
+  // to match how SheetJS's own cellDates:true option builds Date objects —
+  // it uses the LOCAL-timezone midnight for a given calendar day, not UTC
+  // midnight — otherwise viewers east/west of UTC (e.g. GMT+8) see every
+  // date shifted by a day.
+  function excelDateToJS(v){
+    if(v instanceof Date) return v;
+    if(typeof v==='number'){ var d=XLSX.SSF.parse_date_code(v); if(d) return new Date(d.y,d.m-1,d.d,d.H||0,d.M||0,d.S||0); }
+    if(typeof v==='string'){ var t=Date.parse(v); if(!isNaN(t)) return new Date(t); }
+    return null;
+  }
+  function fmtDate(d){
+    if(!d) return '';
+    var dt = (d instanceof Date)? d : excelDateToJS(d);
+    if(!dt || isNaN(dt.getTime())) return String(d);
+    var mm=(dt.getMonth()+1), dd=dt.getDate(), yy=dt.getFullYear();
+    return mm+'/'+dd+'/'+yy;
+  }
+  function normRef(s){ return (s===null||s===undefined)? '' : String(s).trim().replace(/^0+(?=\d)/,'').toUpperCase(); }
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+  // Statement export order varies (newest-first is common but not guaranteed) — find the
+  // row with the latest valid date to read the period-end running balance from, rather
+  // than assuming row 0 is most recent.
+  function latestBalanceRow(rows){
+    var best=null;
+    rows.forEach(function(r){
+      if(r.balance==null || !r.date || isNaN(r.date.getTime())) return;
+      if(!best || r.date > best.date) best = r;
+    });
+    return best || rows[0];
+  }
+
+  // ---------------------------------------------------------------
+  // STATE
+  // ---------------------------------------------------------------
+  var state = {
+    bankRows: [],      // {date, desc, debit, credit, balance, ref, id}
+    bookRows: [],       // {date, type:'check'|'deposit', ref, name, amount, id}
+    bankIsExample: true,
+    bookIsExample: true,
+    bookMode: 'upload',
+    priorOutstanding: [], // {id, cat:'checks'|'deposits', date, ref, name, amount} — carried from last month
+    priorMode: 'upload',
+    priorIsExample: false,
+    items: [],          // reconciling item objects after matching
+    matchedCount: 0,
+    unadjBook: null,
+    unadjBank: null
+  };
+
+  var CATS = [
+    {key:'checks',    label:'Checks Issued not taken up by Bank',              side:'bank', sign:-1},
+    {key:'deposits',  label:'Deposits not taken up by Bank',                    side:'bank', sign:+1},
+    {key:'chkoverunder', label:'Checks Issued — Overstated / Understated by Books', side:'book', sign:+1},
+    {key:'deposoverunder', label:'Deposits — Overstated / Understated by Books', side:'book', sign:+1},
+    {key:'memos',     label:'Bank Debit/Credit Memos not taken up by the LGU',  side:'book', sign:+1},
+    {key:'other',     label:'Other Reconciling Items',                          side:'book', sign:+1}
+  ];
+
+  // ---------------------------------------------------------------
+  // EXAMPLE DATA  (illustrative only — replace with your own files)
+  // ---------------------------------------------------------------
+  // These illustrate the three ways the engine matches a transaction: a plain
+  // 1:1 cheque-number match, several book rows clearing as one bank DM (a payroll
+  // batch), and one book deposit clearing as several teller deposits — plus one
+  // stale check and one bank fee that genuinely have no counterpart, so the
+  // leftover categories aren't empty either.
+  function exampleBankRows(){
+    return [
+      {date:new Date(2026,0,30), desc:'ICC-LOCAL CHECK', debit:22450.00, credit:0, balance:259197.91, ref:'1522410'},
+      {date:new Date(2026,0,29), desc:'IIB PAYROLL DM', debit:68500.00, credit:0, balance:281647.91, ref:''},
+      {date:new Date(2026,0,24), desc:'CASH DEPOSIT', debit:0, credit:15000.00, balance:350147.91, ref:''},
+      {date:new Date(2026,0,24), desc:'CASH DEPOSIT', debit:0, credit:9200.00, balance:335147.91, ref:''},
+      {date:new Date(2026,0,24), desc:'LOCAL CHECK DEPOSIT', debit:0, credit:3050.00, balance:325947.91, ref:''},
+      {date:new Date(2026,0,15), desc:'BANK SERVICE CHARGE', debit:350.00, credit:0, balance:322897.91, ref:''},
+      {date:new Date(2026,0,5), desc:'ICC-LOCAL CHECK', debit:6800.00, credit:0, balance:323247.91, ref:'1522399'},
+      {date:new Date(2026,0,3), desc:'CASH DEPOSIT', debit:0, credit:4500.00, balance:330047.91, ref:''}
+    ];
+  }
+  function exampleBookRows(){
+    return [
+      {date:new Date(2026,0,28), type:'check', ref:'1522410', name:'GENESIS HARDWARE', amount:22450.00},
+      {date:new Date(2026,0,27), type:'check', ref:'2026-01-0090', name:'JUAN DELA CRUZ (ADA batch)', amount:20000.00},
+      {date:new Date(2026,0,27), type:'check', ref:'2026-01-0090', name:'MARIA SANTOS (ADA batch)', amount:18500.00},
+      {date:new Date(2026,0,27), type:'check', ref:'2026-01-0090', name:'PEDRO REYES (ADA batch)', amount:30000.00},
+      {date:new Date(2026,0,23), type:'deposit', ref:'26-01-0007', name:'Collections deposited', amount:27250.00}
+    ];
+  }
+  // Illustrates the prior-period carryforward: one outstanding check that
+  // finally clears this month (matched off, tier 0) and one deposit in transit
+  // that clears too, plus one stale check that's still outstanding and gets
+  // carried into this month's "Checks Issued not taken up by Bank" automatically.
+  function examplePriorOutstandingRows(){
+    return [
+      {date:new Date(2025,11,18), cat:'checks', ref:'1522399', name:'OLD VENDOR CORP', amount:6800.00},
+      {date:new Date(2025,11,10), cat:'checks', ref:'1522355', name:'STALE VENDOR TWO', amount:2100.00},
+      {date:new Date(2025,11,29), cat:'deposits', ref:'', name:'December collections in transit', amount:4500.00}
+    ];
+  }
+
+  // ---------------------------------------------------------------
+  // FILE PARSING
+  // ---------------------------------------------------------------
+  function readWorkbook(file, cb){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        var wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+        cb(null, wb);
+      }catch(err){ cb(err); }
+    };
+    reader.onerror = function(){ cb(reader.error); };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function sheetToRows(ws){
+    return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+  }
+
+  function findHeaderRow(rows, keywords, maxScan){
+    maxScan = Math.min(maxScan||15, rows.length);
+    var best=-1, bestScore=0;
+    for(var r=0;r<maxScan;r++){
+      var row = rows[r]||[];
+      var score=0;
+      row.forEach(function(c){
+        if(typeof c==='string'){
+          var cl = c.toLowerCase();
+          keywords.forEach(function(k){ if(cl.indexOf(k)>-1) score++; });
+        }
+      });
+      if(score>bestScore){ bestScore=score; best=r; }
+    }
+    return bestScore>=2 ? best : -1;
+  }
+
+  function colIndexByKeyword(headerRow, keywords){
+    for(var i=0;i<headerRow.length;i++){
+      var c = headerRow[i];
+      if(typeof c==='string'){
+        var cl=c.toLowerCase();
+        for(var k=0;k<keywords.length;k++){ if(cl.indexOf(keywords[k])>-1) return i; }
+      }
+    }
+    return -1;
+  }
+
+  function parseBankFile(file){
+    readWorkbook(file, function(err, wb){
+      if(err){ toast('Could not read that file.'); return; }
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = sheetToRows(ws);
+      var hIdx = findHeaderRow(rows, ['date','description','debit','credit','balance','cheque','check']);
+      if(hIdx===-1){ toast('Could not find bank-statement columns in that file.'); return; }
+      var header = rows[hIdx];
+      var cDate = colIndexByKeyword(header,['date']);
+      var cDesc = colIndexByKeyword(header,['description','particulars']);
+      var cDebit = colIndexByKeyword(header,['debit']);
+      var cCredit = colIndexByKeyword(header,['credit']);
+      var cBal = colIndexByKeyword(header,['balance']);
+      var cRef = colIndexByKeyword(header,['cheque','check no','check number','reference']);
+      var out=[];
+      for(var r=hIdx+1;r<rows.length;r++){
+        var row=rows[r]; if(!row) continue;
+        var dRaw = cDate>-1? row[cDate]:null;
+        var desc = cDesc>-1? row[cDesc]:'';
+        var debit = cDebit>-1? parseFloat(row[cDebit])||0 : 0;
+        var credit = cCredit>-1? parseFloat(row[cCredit])||0 : 0;
+        var bal = cBal>-1? parseFloat(row[cBal]) : null;
+        var ref = cRef>-1? row[cRef]:'';
+        if(dRaw==null && !desc && !debit && !credit) continue;
+        if(typeof desc==='string' && /^account number|^currency|^account type/i.test(desc.trim())) continue;
+        out.push({date:excelDateToJS(dRaw), desc:desc||'', debit:debit, credit:credit, balance:isNaN(bal)?null:bal, ref: ref==null? '' : String(ref)});
+      }
+      if(!out.length){ toast('No bank transactions found in that file.'); return; }
+      state.bankRows = out;
+      state.bankIsExample = false;
+      renderBankTable();
+    });
+  }
+
+  // Book file: try (a) full ledger export (TransDate/TransType/ReferenceNumber/Payee Name/Debit/Credit),
+  // else (b) simple register headers, else (c) WP_xx heuristic
+  function parseBookFile(file){
+    readWorkbook(file, function(err, wb){
+      if(err){ toast('Could not read that file.'); return; }
+      var sheetName = wb.SheetNames.find(function(n){return /^wp_?\d*/i.test(n);}) || wb.SheetNames[0];
+      var ws = wb.Sheets[sheetName];
+      var rows = sheetToRows(ws);
+
+      // (a) Full ledger export — matches accounting-system exports like "AccountLedger":
+      // TransDate, TransType, ReferenceNumber, Payee Name, Debit, Credit
+      var lhIdx = findHeaderRow(rows, ['transdate','transtype','referencenumber','payee','debit','credit']);
+      if(lhIdx>-1){
+        var lh = rows[lhIdx];
+        var lDate = colIndexByKeyword(lh,['transdate','date']);
+        var lType = colIndexByKeyword(lh,['transtype','type']);
+        var lRef = colIndexByKeyword(lh,['referencenumber','reference']);
+        var lPayee = colIndexByKeyword(lh,['payee','name']);
+        var lDebit = colIndexByKeyword(lh,['debit']);
+        var lCredit = colIndexByKeyword(lh,['credit']);
+        if(lDate>-1 && lDebit>-1 && lCredit>-1){
+          var ledgerOut=[], opening=null, runDebit=0, runCredit=0;
+          for(var lr=lhIdx+1;lr<rows.length;lr++){
+            var lrow=rows[lr]; if(!lrow) continue;
+            var ld = lrow[lDate]; if(!ld) continue;
+            var debit = parseFloat(lrow[lDebit])||0;
+            var credit = parseFloat(lrow[lCredit])||0;
+            var ttype = (lType>-1 && lrow[lType])? String(lrow[lType]).trim():'';
+            var payee = (lPayee>-1 && lrow[lPayee])? String(lrow[lPayee]):'';
+            if(/^BB$/i.test(ttype) || /beginning balance/i.test(payee)){
+              opening = debit - credit; continue;
+            }
+            if(!debit && !credit) continue;
+            runDebit += debit; runCredit += credit;
+            ledgerOut.push({date:excelDateToJS(ld), type: credit>0?'check':'deposit',
+              ref: lRef>-1? String(lrow[lRef]==null? '':lrow[lRef]) : '', name:payee, amount: credit>0? credit : debit});
+          }
+          if(ledgerOut.length){
+            state.bookRows = ledgerOut; state.bookIsExample = false; renderBookTable();
+            if(opening!=null){
+              var ending = round2(opening + runDebit - runCredit);
+              state.unadjBook = ending;
+              document.getElementById('f-ubook').value = ending.toFixed(2);
+              toast('Loaded '+ledgerOut.length+' ledger entries — book balance auto-computed from Beginning Balance.');
+            } else {
+              toast('Loaded '+ledgerOut.length+' ledger entries.');
+            }
+            return;
+          }
+        }
+      }
+
+      var hIdx = findHeaderRow(rows, ['date','reference','name','payee','amount','type']);
+      var simple = [];
+      if(hIdx>-1){
+        var header = rows[hIdx];
+        var cDate=colIndexByKeyword(header,['date']);
+        var cRef=colIndexByKeyword(header,['reference','ref no','ref.']);
+        var cName=colIndexByKeyword(header,['name','payee','description']);
+        var cAmt=colIndexByKeyword(header,['amount']);
+        var cType=colIndexByKeyword(header,['type']);
+        if(cDate>-1 && cAmt>-1 && (cName>-1||cRef>-1)){
+          for(var r=hIdx+1;r<rows.length;r++){
+            var row=rows[r]; if(!row) continue;
+            var amt = cAmt>-1? parseFloat(row[cAmt]):NaN;
+            if(!row[cDate] || isNaN(amt) || !amt) continue;
+            var ty = (cType>-1 && row[cType])? String(row[cType]).toLowerCase() : 'check';
+            simple.push({date:excelDateToJS(row[cDate]), type: /dep|receipt|credit/.test(ty)?'deposit':'check',
+              ref: cRef>-1? String(row[cRef]||''):'', name: cName>-1? String(row[cName]||''):'', amount:Math.abs(amt)});
+          }
+        }
+      }
+      if(simple.length){
+        state.bookRows = simple; state.bookIsExample=false; renderBookTable(); toast('Loaded '+simple.length+' book records.'); return;
+      }
+
+      // WP_xx heuristic: find a "type marker" cell (ADA / CHECK / CHEQUE) — book row sits
+      // [date at -1][marker][ref at +1][description at +2 or +3][amount = first positive number within next 6 cells]
+      var wpOut=[];
+      for(var r2=0;r2<rows.length;r2++){
+        var row2=rows[r2]; if(!row2) continue;
+        for(var c=0;c<row2.length;c++){
+          var v=row2[c];
+          if(typeof v==='string' && /^(ada|check|cheque)$/i.test(v.trim())){
+            var dcell = row2[c-1];
+            var refcell = row2[c+1];
+            var desccell = row2[c+2];
+            var amt=null;
+            for(var k=c+3;k<Math.min(c+8,row2.length);k++){
+              var num = parseFloat(row2[k]);
+              if(!isNaN(num) && num>0){ amt=num; break; }
+            }
+            var d = excelDateToJS(dcell);
+            if(d && amt){
+              wpOut.push({date:d, type:'check', ref: refcell? String(refcell):'', name: desccell? String(desccell).slice(0,140):'', amount:amt});
+            }
+          }
+        }
+      }
+      if(wpOut.length){
+        state.bookRows = wpOut; state.bookIsExample=false; renderBookTable();
+        toast('Detected '+wpOut.length+' disbursements from the working paper — reclassify any deposits.');
+        return;
+      }
+      toast('Could not detect book records in that file — try "Enter manually" instead.');
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // PRIOR-PERIOD WORKBOOK PARSING
+  // ---------------------------------------------------------------
+  // Picks the chronologically latest schedule sheet out of a multi-month BR
+  // workbook (sheet order in the file isn't guaranteed). Recognizes both the
+  // COA-style "S2025_12" / "S_2025_12" naming and this tool's own export
+  // naming, "S_Jan2026" — so a workbook this tool produced can be fed
+  // straight back in next month as the new "prior period" source.
+  var MONTH_ABBR = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  function findLatestSSheet(sheetNames){
+    var best=null, bestKey=-1;
+    sheetNames.forEach(function(n){
+      var s = String(n).trim();
+      var key = -1;
+      var m1 = /^S[_-]?(\d{4})[_-]?(\d{2})$/i.exec(s);
+      if(m1){ key = parseInt(m1[1],10)*100+parseInt(m1[2],10); }
+      else {
+        var m2 = /^S[_-]?([A-Za-z]{3,})[_-]?(\d{4})$/i.exec(s);
+        if(m2){ var mon = MONTH_ABBR[m2[1].slice(0,3).toLowerCase()]; if(mon) key = parseInt(m2[2],10)*100+mon; }
+      }
+      if(key>bestKey){ bestKey=key; best=n; }
+    });
+    return best;
+  }
+  // Maps a category label row to one of the 6 CATS keys. Recognizes both the
+  // COA template's wording (separate "Check Issued Overstated by " / "...
+  // Understated by" tables) and this tool's own export wording (one combined
+  // "Overstated / Understated" table per side).
+  function classifyCategoryHeader(text){
+    var t = String(text).toLowerCase();
+    if(/^other reconciling/.test(t)) return 'other';
+    if(/memo/.test(t)) return 'memos';
+    if(/check/.test(t) && /(overstated|understated)/.test(t)) return 'chkoverunder';
+    if(/deposit/.test(t) && /(overstated|understated)/.test(t)) return 'deposoverunder';
+    if(/check/.test(t) && (/not taken up/.test(t) || /outstanding/.test(t))) return 'checks';
+    if(/deposit/.test(t) && (/not taken up/.test(t) || /in transit/.test(t) || /outstanding/.test(t))) return 'deposits';
+    return null;
+  }
+  // For a category split across two separate same-sign tables (the COA
+  // template's own "Overstated by" / "Understated by" sheets, as opposed to
+  // this tool's combined export table) the direction has to come from which
+  // table the row is in, not from the cell value's sign. Overstating a check
+  // (or understating a deposit) means the book balance is too LOW, so it's
+  // added back; the opposite is subtracted.
+  function overUnderSignHint(label, cat){
+    var t = label.toLowerCase();
+    var hasOver = /overstated/.test(t), hasUnder = /understated/.test(t);
+    if(hasOver && hasUnder) return null; // combined header — cell already carries the correct sign
+    if(cat==='chkoverunder'){ if(hasOver) return 1; if(hasUnder) return -1; }
+    if(cat==='deposoverunder'){ if(hasUnder) return 1; if(hasOver) return -1; }
+    return null;
+  }
+  // A schedule sheet lists each reconciling-item category as a label row, a
+  // column-header row, then data rows until a blank row or the next
+  // category label.
+  var CATEGORY_LABEL_RE = /not taken up|overstated|understated|memos|other reconciling/i;
+  function parsePriorWorkbookRows(rows){
+    var out = [];
+    for(var r=0;r<rows.length;r++){
+      var row = rows[r]; if(!row) continue;
+      var label = (typeof row[0]==='string')? row[0].trim() : '';
+      if(!label) continue;
+      var cat = classifyCategoryHeader(label);
+      if(!cat) continue;
+      var hrow = rows[r+1] || [];
+      var cDate = colIndexByKeyword(hrow,['date']); if(cDate===-1) cDate=0;
+      var cRef = colIndexByKeyword(hrow,['reference','ref no','ref.']); if(cRef===-1) cRef=1;
+      var cName = colIndexByKeyword(hrow,['name','payee']); if(cName===-1) cName=2;
+      var cAmt = colIndexByKeyword(hrow,['amount']); if(cAmt===-1) cAmt=5;
+      var cRmk = colIndexByKeyword(hrow,['remark']); if(cRmk===-1) cRmk=6;
+      var cDebit = colIndexByKeyword(hrow,['debit']);
+      var cCredit = colIndexByKeyword(hrow,['credit']);
+      var signHint = overUnderSignHint(label, cat);
+      var rr = r+2;
+      while(rr<rows.length){
+        var drow = rows[rr];
+        if(!drow || drow.every(function(v){ return v==null || v===''; })){ break; }
+        var d0 = (typeof drow[0]==='string')? drow[0].trim() : '';
+        if(d0 && CATEGORY_LABEL_RE.test(d0)) break;
+        var date = excelDateToJS(drow[cDate]);
+        var raw = parseFloat(drow[cAmt]);
+        var remarks = drow[cRmk];
+        if(date && !isNaN(date.getTime()) && !isNaN(raw) && raw!==0 && !(typeof remarks==='string' && /cancel/i.test(remarks))){
+          var amount;
+          if(cat==='checks' || cat==='deposits'){
+            amount = Math.abs(raw); // always carried as a magnitude — the sign is reapplied when carried forward
+          } else if(cat==='chkoverunder' || cat==='deposoverunder'){
+            amount = signHint!=null? signHint*Math.abs(raw) : raw; // combined-table exports already carry the correct sign
+          } else if(cat==='memos' && cDebit>-1 && cCredit>-1){
+            // COA template: separate Debit/Credit columns, Amount is an unsigned magnitude
+            var isDebitMemo = (parseFloat(drow[cDebit])||0) > 0;
+            amount = isDebitMemo? -Math.abs(raw) : Math.abs(raw);
+          } else {
+            amount = raw; // this tool's own export — already signed
+          }
+          out.push({id:uid(), cat:cat, date:date, ref: drow[cRef]!=null? String(drow[cRef]):'', name: drow[cName]!=null? String(drow[cName]):'', amount:amount});
+        }
+        rr++;
+      }
+      r = rr-1;
+    }
+    return out;
+  }
+  function parsePriorFile(file){
+    readWorkbook(file, function(err, wb){
+      if(err){ toast('Could not read that file.'); return; }
+      var sheetName = findLatestSSheet(wb.SheetNames) || wb.SheetNames.find(function(n){ return /schedule/i.test(n); });
+      if(!sheetName){ toast('Could not find a schedule ("S_") sheet in that workbook.'); return; }
+      var rows = sheetToRows(wb.Sheets[sheetName]);
+      var out = parsePriorWorkbookRows(rows);
+      state.priorOutstanding = out;
+      state.priorIsExample = false;
+      renderPriorPreview();
+      toast(out.length? ('Loaded '+out.length+' item'+(out.length===1?'':'s')+' from "'+sheetName+'".') : ('No outstanding reconciling items found on "'+sheetName+'".'));
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // RENDER: bank table
+  // ---------------------------------------------------------------
+  function renderBankTable(){
+    var t = document.getElementById('bank-table');
+    var rows = state.bankRows;
+    t.querySelector('thead').innerHTML = '<tr><th>Date</th><th>Description</th><th>Cheque/Ref</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr>';
+    var tb = t.querySelector('tbody'); tb.innerHTML='';
+    rows.slice(0,300).forEach(function(r){
+      var tr=document.createElement('tr'); if(state.bankIsExample) tr.className='example';
+      tr.innerHTML = '<td>'+fmtDate(r.date)+'</td><td>'+escapeHtml(r.desc)+'</td><td>'+escapeHtml(r.ref||'')+'</td>'+
+        '<td class="num">'+(r.debit? fmt(r.debit):'')+'</td><td class="num">'+(r.credit? fmt(r.credit):'')+'</td>'+
+        '<td class="num">'+(r.balance!=null? fmt(r.balance):'')+'</td>';
+      tb.appendChild(tr);
+    });
+    document.getElementById('bank-count').textContent = rows.length+' transaction'+(rows.length===1?'':'s');
+    var last = latestBalanceRow(rows);
+    document.getElementById('bank-endbal').textContent = (last && last.balance!=null)? 'Latest balance: '+fmt(last.balance) : '';
+    document.getElementById('bank-pill').textContent = state.bankIsExample? 'example':'loaded';
+    document.getElementById('bank-pill').className = 'pill '+(state.bankIsExample?'example':'loaded');
+    if(last && last.balance!=null){
+      state.unadjBank = last.balance;
+      document.getElementById('f-ubank').value = last.balance.toFixed(2);
+    }
+  }
+
+  function renderBookTable(){
+    var t = document.getElementById('book-table');
+    var rows = state.bookRows;
+    t.querySelector('thead').innerHTML = '<tr><th>Date</th><th>Type</th><th>Reference</th><th>Payee / description</th><th class="num">Amount</th></tr>';
+    var tb = t.querySelector('tbody'); tb.innerHTML='';
+    rows.slice(0,300).forEach(function(r){
+      var tr=document.createElement('tr'); if(state.bookIsExample) tr.className='example';
+      tr.innerHTML = '<td>'+fmtDate(r.date)+'</td><td>'+(r.type==='deposit'?'Deposit':'Check / ADA')+'</td><td>'+escapeHtml(r.ref||'')+'</td>'+
+        '<td>'+escapeHtml(r.name||'')+'</td><td class="num">'+fmt(r.amount)+'</td>';
+      tb.appendChild(tr);
+    });
+    document.getElementById('book-count').textContent = rows.length+' record'+(rows.length===1?'':'s');
+    document.getElementById('book-pill').textContent = state.bookIsExample? 'example':'loaded';
+    document.getElementById('book-pill').className = 'pill '+(state.bookIsExample?'example':'loaded');
+    var wrap = document.getElementById('book-preview-wrap');
+    wrap.style.display = (state.bookMode==='upload')? '' : 'none';
+  }
+
+  function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  // ---------------------------------------------------------------
+  // MANUAL BOOK ENTRY TABLE
+  // ---------------------------------------------------------------
+  var manualRows = []; // {id,date,type,ref,name,amount, example}
+  function seedManualExamples(){
+    manualRows = exampleBookRows().map(function(r){ return Object.assign({id:uid(), example:true}, r, {date: fmtDateInput(r.date)}); });
+  }
+  function fmtDateInput(d){
+    if(!d) return '';
+    var dt = d instanceof Date? d: new Date(d);
+    if(isNaN(dt.getTime())) return '';
+    return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+  }
+  function renderManualTable(){
+    var tb = document.getElementById('book-manual-body');
+    tb.innerHTML='';
+    manualRows.forEach(function(r){
+      var tr=document.createElement('tr'); if(r.example) tr.className='example';
+      tr.innerHTML =
+        '<td><input type="date" value="'+r.date+'" data-f="date"></td>'+
+        '<td><select data-f="type"><option value="check"'+(r.type==='check'?' selected':'')+'>Check / ADA</option><option value="deposit"'+(r.type==='deposit'?' selected':'')+'>Deposit</option></select></td>'+
+        '<td><input type="text" value="'+escapeHtml(r.ref||'')+'" data-f="ref" placeholder="No."></td>'+
+        '<td><input type="text" value="'+escapeHtml(r.name||'')+'" data-f="name" placeholder="Payee / description"></td>'+
+        '<td class="amt"><input type="number" step="0.01" value="'+(r.amount||'')+'" data-f="amount" placeholder="0.00"></td>'+
+        '<td><button class="xbtn" title="Delete row">×</button></td>';
+      tr.querySelectorAll('[data-f]').forEach(function(inp){
+        inp.addEventListener('input', function(){
+          if(r.example){ r.example=false; tr.classList.remove('example'); }
+          var f=inp.getAttribute('data-f');
+          r[f] = f==='amount'? parseFloat(inp.value)||0 : inp.value;
+          syncManualToBookRows();
+        });
+      });
+      tr.querySelector('.xbtn').addEventListener('click', function(){
+        manualRows = manualRows.filter(function(x){return x.id!==r.id;});
+        renderManualTable(); syncManualToBookRows();
+      });
+      tb.appendChild(tr);
+    });
+  }
+  function syncManualToBookRows(){
+    var real = manualRows.filter(function(r){ return !r.example && r.date && r.amount; });
+    state.bookRows = real.map(function(r){ return {date:new Date(r.date+'T00:00:00'), type:r.type, ref:r.ref, name:r.name, amount:Math.abs(r.amount)}; });
+    state.bookIsExample = real.length===0;
+    document.getElementById('book-count').textContent = state.bookRows.length+' record'+(state.bookRows.length===1?'':'s');
+  }
+
+  document.getElementById('book-addrow').addEventListener('click', function(){
+    manualRows.push({id:uid(), date:'', type:'check', ref:'', name:'', amount:'', example:false});
+    renderManualTable();
+  });
+
+  // ---------------------------------------------------------------
+  // PRIOR-PERIOD MANUAL ENTRY TABLE + PREVIEW
+  // ---------------------------------------------------------------
+  var PRIOR_CAT_SHORT = {checks:'Outstanding check', deposits:'Deposit in transit',
+    chkoverunder:'Check over/understated', deposoverunder:'Deposit over/understated',
+    memos:'Bank memo', other:'Other item'};
+  var priorManualRows = []; // {id,date,cat,ref,name,amount,example}
+  function seedPriorManualExamples(){
+    priorManualRows = examplePriorOutstandingRows().map(function(r){ return Object.assign({id:uid(), example:true}, r, {date: fmtDateInput(r.date)}); });
+  }
+  function renderPriorManualTable(){
+    var tb = document.getElementById('prior-manual-body');
+    tb.innerHTML='';
+    priorManualRows.forEach(function(r){
+      var tr=document.createElement('tr'); if(r.example) tr.className='example';
+      var opts = CATS.map(function(c){ return '<option value="'+c.key+'"'+(r.cat===c.key?' selected':'')+'>'+PRIOR_CAT_SHORT[c.key]+'</option>'; }).join('');
+      tr.innerHTML =
+        '<td><input type="date" value="'+r.date+'" data-f="date"></td>'+
+        '<td><select data-f="cat">'+opts+'</select></td>'+
+        '<td><input type="text" value="'+escapeHtml(r.ref||'')+'" data-f="ref" placeholder="No."></td>'+
+        '<td><input type="text" value="'+escapeHtml(r.name||'')+'" data-f="name" placeholder="Payee / description"></td>'+
+        '<td class="amt"><input type="number" step="0.01" value="'+(r.amount||'')+'" data-f="amount" placeholder="0.00"></td>'+
+        '<td><button class="xbtn" title="Delete row">×</button></td>';
+      tr.querySelectorAll('[data-f]').forEach(function(inp){
+        inp.addEventListener('input', function(){
+          if(r.example){ r.example=false; tr.classList.remove('example'); }
+          var f=inp.getAttribute('data-f');
+          r[f] = f==='amount'? parseFloat(inp.value)||0 : inp.value;
+          syncPriorManualToRows();
+        });
+      });
+      tr.querySelector('.xbtn').addEventListener('click', function(){
+        priorManualRows = priorManualRows.filter(function(x){return x.id!==r.id;});
+        renderPriorManualTable(); syncPriorManualToRows();
+      });
+      tb.appendChild(tr);
+    });
+  }
+  function syncPriorManualToRows(){
+    var real = priorManualRows.filter(function(r){ return !r.example && r.date && r.amount; });
+    state.priorOutstanding = real.map(function(r){
+      var isMagnitude = (r.cat==='checks' || r.cat==='deposits');
+      return {id:r.id, cat:r.cat, date:new Date(r.date+'T00:00:00'), ref:r.ref, name:r.name, amount: isMagnitude? Math.abs(r.amount) : r.amount};
+    });
+    state.priorIsExample = false;
+    renderPriorPreview();
+  }
+  // Six category groups, matching Step 4's results layout exactly — each
+  // reconciling-item category gets its own table.
+  function renderPriorPreview(){
+    var host = document.getElementById('prior-groups');
+    host.innerHTML = '';
+    var rows = state.priorOutstanding;
+    CATS.forEach(function(cat){
+      var catRows = rows.filter(function(r){ return r.cat===cat.key; });
+      var group = document.createElement('div'); group.className='catgroup';
+      var stripeColor = cat.side==='bank'? 'var(--accent)':'var(--gold)';
+      var sub = catRows.reduce(function(s,r){ return s+r.amount; },0);
+      group.innerHTML = '<div class="cathead"><span class="stripe" style="background:'+stripeColor+'"></span>'+
+        '<h3>'+cat.label+'</h3><span class="side">adjusts '+cat.side+'</span>'+
+        '<span class="subtotal num">'+fmt(sub)+'</span></div>';
+      if(catRows.length){
+        var tbl = document.createElement('table'); tbl.className='items';
+        tbl.innerHTML = '<thead><tr><th>Date</th><th>Reference</th><th>Description</th><th class="num" style="width:120px">Amount</th></tr></thead>';
+        var tb = document.createElement('tbody');
+        catRows.forEach(function(r){
+          var tr=document.createElement('tr'); if(state.priorIsExample) tr.className='example';
+          tr.innerHTML = '<td>'+fmtDate(r.date)+'</td><td class="ref">'+escapeHtml(r.ref||'')+'</td><td>'+escapeHtml(r.name||'')+'</td>'+
+            '<td class="num">'+fmt(r.amount)+'</td>';
+          tb.appendChild(tr);
+        });
+        tbl.appendChild(tb); group.appendChild(tbl);
+      } else {
+        var e=document.createElement('div'); e.className='empty'; e.textContent='No items in this category.';
+        group.appendChild(e);
+      }
+      host.appendChild(group);
+    });
+    document.getElementById('prior-count').textContent = rows.length? (rows.length+' item'+(rows.length===1?'':'s')+' carried in') : 'None — starting fresh';
+    var pill = document.getElementById('prior-pill');
+    pill.textContent = rows.length? (state.priorIsExample?'example':'loaded') : 'none';
+    pill.className = 'pill '+(rows.length? (state.priorIsExample?'example':'loaded') : '');
+    var wrap = document.getElementById('prior-preview-wrap');
+    wrap.style.display = (state.priorMode==='upload')? '' : 'none';
+  }
+
+  document.getElementById('prior-addrow').addEventListener('click', function(){
+    priorManualRows.push({id:uid(), date:'', cat:'checks', ref:'', name:'', amount:'', example:false});
+    renderPriorManualTable();
+  });
+  wireDropzone('prior-drop','prior-file', parsePriorFile);
+  document.getElementById('prior-example').addEventListener('click', function(){
+    state.priorOutstanding = examplePriorOutstandingRows().map(function(r){ return {id:uid(), cat:r.cat, date:r.date, ref:r.ref, name:r.name, amount:r.amount}; });
+    state.priorIsExample = true;
+    renderPriorPreview();
+    toast('Example prior-period items loaded.');
+  });
+  document.getElementById('prior-clear').addEventListener('click', function(){
+    state.priorOutstanding = []; state.priorIsExample=false; renderPriorPreview();
+  });
+  document.querySelectorAll('#prior-panel .mode-btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#prior-panel .mode-btn').forEach(function(x){x.classList.remove('active');});
+      b.classList.add('active');
+      state.priorMode = b.getAttribute('data-pmode');
+      document.getElementById('prior-upload-mode').style.display = state.priorMode==='upload'? '':'none';
+      document.getElementById('prior-manual-mode').style.display = state.priorMode==='manual'? '':'none';
+      if(state.priorMode==='manual'){ syncPriorManualToRows(); }
+      else { renderPriorPreview(); }
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // UPLOAD WIRING
+  // ---------------------------------------------------------------
+  function wireDropzone(dropId, fileId, onFile){
+    var dz=document.getElementById(dropId), fi=document.getElementById(fileId);
+    fi.addEventListener('change', function(){ if(fi.files[0]) onFile(fi.files[0]); });
+    dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', function(){ dz.classList.remove('drag'); });
+    dz.addEventListener('drop', function(e){
+      e.preventDefault(); dz.classList.remove('drag');
+      if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+    });
+  }
+  wireDropzone('bank-drop','bank-file', parseBankFile);
+  wireDropzone('book-drop','book-file', parseBookFile);
+
+  document.getElementById('bank-example').addEventListener('click', function(){
+    state.bankRows = exampleBankRows(); state.bankIsExample=true; renderBankTable(); toast('Example bank statement loaded.');
+  });
+  document.getElementById('bank-clear').addEventListener('click', function(){
+    state.bankRows = []; state.bankIsExample=true; renderBankTable();
+  });
+  document.getElementById('book-example').addEventListener('click', function(){
+    state.bookRows = exampleBookRows(); state.bookIsExample=true; renderBookTable(); toast('Example book records loaded.');
+  });
+  document.getElementById('book-clear').addEventListener('click', function(){
+    state.bookRows = []; state.bookIsExample=true; renderBookTable();
+  });
+
+  document.querySelectorAll('#book-panel .mode-btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#book-panel .mode-btn').forEach(function(x){x.classList.remove('active');});
+      b.classList.add('active');
+      state.bookMode = b.getAttribute('data-mode');
+      document.getElementById('book-upload-mode').style.display = state.bookMode==='upload'? '':'none';
+      document.getElementById('book-manual-mode').style.display = state.bookMode==='manual'? '':'none';
+      if(state.bookMode==='manual'){ syncManualToBookRows(); renderBookTable(); }
+      else { renderBookTable(); }
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // MATCHING ENGINE
+  // ---------------------------------------------------------------
+  // Bank statements often clear several book entries as one lump transaction
+  // (e.g. six payroll ADAs as one DM, five teller deposits as one CRDJ entry).
+  // So matching runs in tiers, each one only touching what the previous tier
+  // left unmatched:
+  //   1. exact reference-number + amount match (check/DV no. == cheque no.)
+  //   1b. same reference number, different amount -> overstated/understated
+  //   2. remaining book rows are grouped by shared reference number (an ADA
+  //      batch, a deposit slip) and the GROUP TOTAL is matched to one bank row
+  //   3. whatever's still unmatched is matched by amount against a SUBSET of
+  //      nearby unmatched bank rows that sum to it (handles split deposits/DMs
+  //      with no shared reference at all)
+  // Anything left after that is a genuine reconciling item.
+  function bankSideAmt(k, isDisb){ return isDisb? k.debit : k.credit; }
+
+  function subsetSumMatch(targetCents, cents, cap){
+    cap = Math.min(cap||18, cents.length);
+    var sums = new Map(); sums.set(0, []);
+    for(var i=0;i<cap;i++){
+      var c = cents[i];
+      var snapshot = Array.from(sums.entries());
+      for(var j=0;j<snapshot.length;j++){
+        var s = snapshot[j][0], path = snapshot[j][1];
+        var ns = s + c;
+        if(ns===targetCents) return path.concat([i]);
+        if(!sums.has(ns) && sums.size<8000) sums.set(ns, path.concat([i]));
+      }
+    }
+    return null;
+  }
+
+  function runReconciliation(){
+    var bank = state.bankRows.map(function(r,i){ return Object.assign({_i:i, _used:false}, r); });
+    var book = state.bookRows.map(function(r,i){ return Object.assign({_i:i, _used:false}, r); });
+
+    var items = [];
+    var matchedBook = 0, matchedBank = 0;
+
+    // TIER 0: prior-period reconciling items, across all 6 categories. None
+    // of these appear in this month's book export (they were already
+    // recorded last period) or bank export unless they're clearing now.
+    //  - Outstanding checks/deposits are genuine pending transactions: check
+    //    whether the bank statement shows them clearing this month; if so
+    //    they're resolved and dropped rather than mis-read as an unexplained
+    //    bank memo. Still-unmatched ones carry forward automatically.
+    //  - Overstated/understated, memo, and "other" items have no bank-side
+    //    transaction to clear against — they're resolved only by an actual
+    //    correcting entry in the books — so they simply carry forward as-is
+    //    until they stop appearing in a future prior-period upload.
+    var priorCleared = 0, priorCarried = 0;
+    (state.priorOutstanding||[]).forEach(function(p){
+      if(p.cat==='checks' || p.cat==='deposits'){
+        var isDisb = p.cat!=='deposits';
+        var rn = p.ref? normRef(p.ref) : '';
+        var cand = rn? bank.find(function(k){ return !k._used && normRef(k.ref)===rn && Math.abs(bankSideAmt(k,isDisb)-p.amount)<0.01; }) : null;
+        if(!cand){
+          var pool = bank.filter(function(k){ return !k._used && Math.abs(bankSideAmt(k,isDisb)-p.amount)<0.01; });
+          if(pool.length){
+            pool.sort(function(x,y){
+              var dx = p.date&&x.date? Math.abs(x.date-p.date):9e15;
+              var dy = p.date&&y.date? Math.abs(y.date-p.date):9e15;
+              return dx-dy;
+            });
+            cand = pool[0];
+          }
+        }
+        if(cand){
+          cand._used = true; matchedBank++; priorCleared++;
+        } else {
+          items.push({id:uid(), cat: p.cat, date:p.date, ref:p.ref, name:p.name,
+            amount: isDisb? -p.amount : p.amount, side:'bank', include:true,
+            remarks:'Carried forward — outstanding since '+fmtDate(p.date)});
+          priorCarried++;
+        }
+      } else {
+        items.push({id:uid(), cat:p.cat, date:p.date, ref:p.ref, name:p.name,
+          amount: p.amount, side:'book', include:true,
+          remarks:'Carried forward — outstanding since '+fmtDate(p.date)});
+        priorCarried++;
+      }
+    });
+
+    // TIER 1 + 1b: exact reference-number match (same cheque/DV/ADA-batch no.)
+    book.forEach(function(b){
+      if(b._used || !b.ref) return;
+      var isDisb = b.type!=='deposit';
+      var rn = normRef(b.ref);
+      var cands = bank.filter(function(k){ return !k._used && normRef(k.ref)===rn && bankSideAmt(k,isDisb)>0; });
+      if(!cands.length) return;
+      var exact = cands.find(function(k){ return Math.abs(bankSideAmt(k,isDisb)-b.amount)<0.01; });
+      var k = exact || cands[0];
+      var bAmt = bankSideAmt(k, isDisb);
+      b._used = true; k._used = true; matchedBook++; matchedBank++;
+      if(!exact){
+        var diff = round2(bAmt - b.amount);
+        var adj = isDisb? round2(b.amount-bAmt) : round2(bAmt-b.amount);
+        var word = diff>0? 'Understated':'Overstated';
+        items.push({id:uid(), cat: isDisb?'chkoverunder':'deposoverunder',
+          date:b.date, ref:b.ref, name:(b.name||k.desc||'')+' — '+word+' by books',
+          amount: adj, side:'book', include:true, remarks:'Book '+fmt(b.amount)+' vs bank '+fmt(bAmt)});
+      }
+    });
+
+    // Group whatever's left by shared reference number (ADA batch / deposit slip);
+    // rows with no reference become their own single-row unit.
+    var groups = {}, singles = [];
+    book.forEach(function(b){
+      if(b._used) return;
+      if(b.ref){ var key=b.type+'|'+normRef(b.ref); (groups[key]=groups[key]||[]).push(b); }
+      else singles.push([b]);
+    });
+    var units = Object.keys(groups).map(function(k){ return groups[k]; }).concat(singles);
+    units.forEach(function(u){
+      u._total = round2(u.reduce(function(s,x){return s+x.amount;},0));
+      u._isDisb = u[0].type!=='deposit';
+      u._date = u[u.length-1].date;
+    });
+    units.sort(function(a,b){ return b._total - a._total; }); // big, unambiguous sums first
+
+    units.forEach(function(u){
+      var isDisb = u._isDisb, total = u._total;
+
+      // TIER 2: group/row total == a single unmatched bank row
+      var cand = bank.find(function(k){ return !k._used && bankSideAmt(k,isDisb)>0 && Math.abs(bankSideAmt(k,isDisb)-total)<0.01; });
+      if(cand){
+        u.forEach(function(x){ x._used=true; matchedBook++; });
+        cand._used = true; matchedBank++;
+        return;
+      }
+
+      // TIER 3: group/row total == sum of a subset of nearby unmatched bank rows
+      var pool = bank.filter(function(k){ return !k._used && bankSideAmt(k,isDisb)>0; });
+      pool.sort(function(x,y){
+        var dx = u._date&&x.date? Math.abs(x.date-u._date):9e15;
+        var dy = u._date&&y.date? Math.abs(y.date-u._date):9e15;
+        return dx-dy;
+      });
+      var capN = Math.min(18, pool.length);
+      var cents = pool.slice(0,capN).map(function(k){ return Math.round(bankSideAmt(k,isDisb)*100); });
+      var res = subsetSumMatch(Math.round(total*100), cents, capN);
+      if(res){
+        u.forEach(function(x){ x._used=true; matchedBook++; });
+        res.forEach(function(idx){ pool[idx]._used=true; matchedBank++; });
+      }
+    });
+
+    // Leftover book -> checks/deposits not taken up by bank. Outstanding
+    // checks REDUCE the adjusted bank balance (they'll clear later), deposits
+    // in transit ADD to it — matches the sign convention already used below
+    // for overstated/understated and memo items, and the LGU's own BRS
+    // template (outstanding checks are entered as a negative bank figure).
+    book.filter(function(b){return !b._used;}).forEach(function(b){
+      var isDep = b.type==='deposit';
+      items.push({id:uid(), cat: isDep?'deposits':'checks', date:b.date, ref:b.ref, name:b.name,
+        amount: isDep? b.amount : -b.amount, side:'bank', include:true, remarks:''});
+    });
+
+    // Leftover bank -> debit/credit memos not taken up by LGU
+    bank.filter(function(k){return !k._used && (k.debit>0||k.credit>0);}).forEach(function(k){
+      var isDebit = k.debit>0;
+      items.push({id:uid(), cat:'memos', date:k.date, ref:k.ref, name:k.desc,
+        amount: isDebit? -k.debit : k.credit, side:'book', include:true, remarks: isDebit?'Debit memo':'Credit memo'});
+    });
+
+    state.items = items;
+    state.matchedCount = matchedBook;
+    state.matchedBankCount = matchedBank;
+
+    document.getElementById('results-block').style.display='';
+    document.getElementById('export-block').style.display='';
+    renderResults();
+    document.getElementById('results-block').scrollIntoView({behavior:'smooth', block:'start'});
+
+    if(priorCleared || priorCarried){
+      var msg=[];
+      if(priorCleared) msg.push(priorCleared+' prior-period item'+(priorCleared===1?'':'s')+' cleared this month');
+      if(priorCarried) msg.push(priorCarried+' still outstanding, carried forward');
+      toast(msg.join(' · ')+'.');
+    }
+  }
+
+  document.getElementById('run-btn').addEventListener('click', function(){
+    // Either side — or both — can legitimately have no transactions this
+    // period (a dormant account, a brand-new book with nothing posted yet,
+    // a bank with no activity). As long as there's SOMETHING to reconcile —
+    // a bank statement, book records, or prior-period carryover — let it run;
+    // whichever side is empty just won't produce any matches or leftovers.
+    if(!state.bankRows.length && !state.bookRows.length && !(state.priorOutstanding&&state.priorOutstanding.length)){
+      toast('Load a bank statement, book records, or prior-period items first.');
+      return;
+    }
+    runReconciliation();
+  });
+
+  // ---------------------------------------------------------------
+  // RESULTS RENDER
+  // ---------------------------------------------------------------
+  function catSum(key){
+    return state.items.filter(function(it){ return it.cat===key && it.include; })
+      .reduce(function(s,it){ return s+it.amount; },0);
+  }
+  function sideSum(side){
+    return state.items.filter(function(it){ return it.side===side && it.include; })
+      .reduce(function(s,it){ return s+it.amount; },0);
+  }
+
+  function renderResults(){
+    var host = document.getElementById('cat-groups');
+    host.innerHTML='';
+    CATS.forEach(function(cat){
+      var rows = state.items.filter(function(it){ return it.cat===cat.key; });
+      var sub = rows.filter(function(r){return r.include;}).reduce(function(s,r){return s+r.amount;},0);
+      var group = document.createElement('div'); group.className='catgroup';
+      var stripeColor = cat.side==='bank'? 'var(--accent)':'var(--gold)';
+      group.innerHTML =
+        '<div class="cathead"><span class="stripe" style="background:'+stripeColor+'"></span>'+
+        '<h3>'+cat.label+'</h3><span class="side">adjusts '+cat.side+'</span>'+
+        '<span class="subtotal num">'+fmt(sub)+'</span></div>';
+      if(rows.length){
+        var tbl = document.createElement('table'); tbl.className='items';
+        tbl.innerHTML = '<thead><tr><th style="width:26px"></th><th>Date</th><th>Reference</th><th>Description</th><th class="num" style="width:120px">Amount</th><th>Remarks</th><th style="width:24px"></th></tr></thead>';
+        var tb = document.createElement('tbody');
+        rows.forEach(function(it){
+          var tr = document.createElement('tr'); if(!it.include) tr.className='excluded';
+          tr.innerHTML =
+            '<td><input type="checkbox" class="chk" '+(it.include?'checked':'')+'></td>'+
+            '<td>'+fmtDate(it.date)+'</td>'+
+            '<td class="ref">'+escapeHtml(it.ref||'')+'</td>'+
+            '<td>'+escapeHtml(it.name||'')+'</td>'+
+            '<td class="num"><input class="amtedit" type="number" step="0.01" value="'+it.amount.toFixed(2)+'"></td>'+
+            '<td><input class="remark" type="text" value="'+escapeHtml(it.remarks||'')+'" placeholder="Remarks"></td>'+
+            '<td><button class="xbtn" title="Remove">×</button></td>';
+          tr.querySelector('.chk').addEventListener('change', function(e){ it.include=e.target.checked; renderResults(); });
+          tr.querySelector('.amtedit').addEventListener('input', function(e){ it.amount=parseFloat(e.target.value)||0; renderResults(); });
+          tr.querySelector('.remark').addEventListener('input', function(e){ it.remarks=e.target.value; });
+          tr.querySelector('.xbtn').addEventListener('click', function(){ state.items=state.items.filter(function(x){return x.id!==it.id;}); renderResults(); });
+          tb.appendChild(tr);
+        });
+        tbl.appendChild(tb); group.appendChild(tbl);
+      } else {
+        var e = document.createElement('div'); e.className='empty'; e.textContent='No items in this category.';
+        group.appendChild(e);
+      }
+      var add = document.createElement('div'); add.className='addrow-line';
+      var addBtn = document.createElement('button'); addBtn.className='btn small ghost'; addBtn.textContent='+ Add item';
+      addBtn.addEventListener('click', function(){
+        state.items.push({id:uid(), cat:cat.key, date:new Date(), ref:'', name:'', amount:0, side:cat.side, include:true, remarks:''});
+        renderResults();
+      });
+      add.appendChild(addBtn); group.appendChild(add);
+      host.appendChild(group);
+    });
+
+    // balances
+    var uBook = state.unadjBook!=null? state.unadjBook : 0;
+    var uBank = state.unadjBank!=null? state.unadjBank : 0;
+    var bookAdj = sideSum('book');
+    var bankAdj = sideSum('bank');
+    var adjBook = round2(uBook + bookAdj);
+    var adjBank = round2(uBank + bankAdj);
+    var variance = round2(adjBook - adjBank);
+
+    document.getElementById('book-lines').innerHTML =
+      line('Unadjusted book balance', uBook, true) +
+      CATS.filter(function(c){return c.side==='book';}).map(function(c){ return line(c.label, catSum(c.key)); }).join('') +
+      '<div class="line total"><span>Adjusted book balance</span><span>'+fmt(adjBook)+'</span></div>';
+    document.getElementById('bank-lines').innerHTML =
+      line('Unadjusted bank balance', uBank, true) +
+      CATS.filter(function(c){return c.side==='bank';}).map(function(c){ return line(c.label, catSum(c.key)); }).join('') +
+      '<div class="line total"><span>Adjusted bank balance</span><span>'+fmt(adjBank)+'</span></div>';
+
+    var vcol = document.getElementById('variance-col');
+    var ok = Math.abs(variance) < 0.01;
+    vcol.className = 'col variance '+(ok?'ok':'bad');
+    document.getElementById('variance-amt').textContent = fmt(variance);
+    document.getElementById('variance-msg').textContent = ok? 'Book and bank balances agree.' : 'Balances differ — check unmatched items, duplicate amounts, or the unadjusted balances above.';
+
+    // status bar
+    document.getElementById('s-ubook').textContent = fmt(uBook);
+    document.getElementById('s-ubank').textContent = fmt(uBank);
+    document.getElementById('s-matched').textContent = (state.matchedBankCount!=null && state.matchedBankCount!==state.matchedCount)
+      ? state.matchedCount+' book · '+state.matchedBankCount+' bank' : state.matchedCount;
+    var svc = document.getElementById('s-variance-cell');
+    svc.className = 'cell '+(ok? 'balanced':'variance');
+    document.getElementById('s-variance').textContent = fmt(variance);
+
+    // export tags
+    var tag = (monthSel.value||'').slice(0,3)+document.getElementById('f-year').value;
+    document.getElementById('exp-tag1').textContent = tag;
+    document.getElementById('exp-tag2').textContent = tag;
+  }
+  function line(label, val, muted){
+    return '<div class="line"'+(muted?' style="color:var(--ink-dim)"':'')+'><span>'+label+'</span><span class="num">'+fmt(val)+'</span></div>';
+  }
+
+  // ---------------------------------------------------------------
+  // EXPORT (.xlsx via downloads capability)
+  // ---------------------------------------------------------------
+  var downloadsCap = null;
+  if (window.claude && window.claude.use) {
+    window.claude.use('downloads').then(function(d){ downloadsCap = d; }).catch(function(){ downloadsCap = null; });
+  }
+
+  function buildWorkbook(){
+    var org = document.getElementById('f-org').value;
+    var fund = document.getElementById('f-fund').value;
+    var month = monthSel.value, year = document.getElementById('f-year').value;
+    var bank = document.getElementById('f-bank').value;
+    var branch = document.getElementById('f-branch').value;
+    var acct = document.getElementById('f-acct').value;
+    var prep = document.getElementById('f-prep').value;
+    var cert = document.getElementById('f-cert').value;
+
+    var uBook = state.unadjBook!=null? state.unadjBook:0, uBank = state.unadjBank!=null? state.unadjBank:0;
+    var bookAdj = sideSum('book'), bankAdj = sideSum('bank');
+    var adjBook = round2(uBook+bookAdj), adjBank = round2(uBank+bankAdj);
+    var variance = round2(adjBook-adjBank);
+
+    function catAmt(k){ return round2(catSum(k)); }
+
+    var br = [
+      [org],[' BANK RECONCILIATION STATEMENT'],[' For the Month of '+month+' '+year],
+      ['','Bank Name','',bank,'','Fund',fund],
+      ['','Branch:','',branch],
+      ['','Account No.','',acct],
+      ['Particular','','','','Book','Bank','Explanatory Note'],
+      ['Unadjusted Balances','','','',uBook,uBank,''],
+      ['Reconciling Items'],
+      ['','Checks Issued not taken up by','','', '', catAmt('checks')],
+      ['','Check Issued Overstated/Understated by','','', catAmt('chkoverunder'),''],
+      ['','Deposits not taken up by','','', '', catAmt('deposits')],
+      ['','Deposit Overstated/Understated by','','', catAmt('deposoverunder'),''],
+      ['','Bank Debit/Credit Memos, not taken up by the LGU','','', catAmt('memos'),''],
+      ['','Other Reconciling Items','','', catAmt('other'),''],
+      ['Adjusted Balances','','','',adjBook,adjBank,'', variance],
+      ['','Prepared by:','','','Certified Correct'],
+      ['',prep,'','',cert]
+    ];
+    var wsBR = XLSX.utils.aoa_to_sheet(br);
+    wsBR['!cols'] = [{wch:4},{wch:32},{wch:4},{wch:26},{wch:16},{wch:16},{wch:24}];
+
+    var sch = [['Schedules'],['Bank Reconciliation Month:','',month+' '+year],[]];
+    CATS.forEach(function(cat){
+      sch.push([cat.label]);
+      sch.push(['Date','Reference No','Name','Amount','Remarks']);
+      var rows = state.items.filter(function(it){return it.cat===cat.key && it.include;});
+      if(!rows.length) sch.push(['','','',0,'']);
+      rows.forEach(function(it){ sch.push([fmtDate(it.date), it.ref||'', it.name||'', it.amount, it.remarks||'']); });
+      sch.push(['','','Subtotal', catAmt(cat.key), '']);
+      sch.push([]);
+    });
+    var wsS = XLSX.utils.aoa_to_sheet(sch);
+    wsS['!cols'] = [{wch:12},{wch:16},{wch:40},{wch:14},{wch:30}];
+
+    var wb = XLSX.utils.book_new();
+    var tag = 'BR_'+(month||'').slice(0,3)+year;
+    var tag2 = 'S_'+(month||'').slice(0,3)+year;
+    XLSX.utils.book_append_sheet(wb, wsBR, tag.slice(0,31));
+    XLSX.utils.book_append_sheet(wb, wsS, tag2.slice(0,31));
+    return {wb:wb, filename:'BRS_'+(acct||'account')+'_'+monthTag(month,year)+'.xlsx'};
+  }
+
+  // A plain-browser fallback for wherever this page is hosted OUTSIDE a
+  // Claude Artifact (a plain webpage, a local file, an installed PWA) —
+  // the Claude "downloads" capability above doesn't exist there, so save
+  // via a normal, momentary <a download> link instead.
+  function browserDownload(filename, blob){
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+  document.getElementById('export-btn').addEventListener('click', function(){
+    var built = buildWorkbook();
+    var out = XLSX.write(built.wb, {bookType:'xlsx', type:'array'});
+    var blob = new Blob([out], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    if(!downloadsCap){
+      browserDownload(built.filename, blob);
+      toast('Saved '+built.filename);
+      return;
+    }
+    downloadsCap.save({filename: built.filename, data: blob}).then(function(){
+      toast('Saved '+built.filename);
+    }).catch(function(e){
+      if(e && e.code==='declined') return;
+      toast('Could not save the file ('+(e&&e.code||'error')+').');
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // localStorage: remember header defaults (per-viewer convenience only)
+  // ---------------------------------------------------------------
+  function saveHeaderPrefs(){
+    try{
+      var o={};
+      ['f-account-picker','f-org','f-fund','f-bank','f-branch','f-acct','f-prep','f-cert'].forEach(function(id){ o[id]=document.getElementById(id).value; });
+      localStorage.setItem('brsw-header', JSON.stringify(o));
+    }catch(e){}
+  }
+  function loadHeaderPrefs(){
+    try{
+      var raw = localStorage.getItem('brsw-header');
+      if(!raw) return;
+      var o = JSON.parse(raw);
+      Object.keys(o).forEach(function(id){ var el=document.getElementById(id); if(el) el.value=o[id]; });
+    }catch(e){}
+  }
+  loadHeaderPrefs();
+  document.getElementById('header-form').addEventListener('input', function(){ saveHeaderPrefs(); if(state.items.length) renderResults(); });
+
+  document.getElementById('f-ubook').addEventListener('input', function(e){
+    state.unadjBook = e.target.value===''? null : parseFloat(e.target.value);
+    if(state.items.length) renderResults();
+  });
+  document.getElementById('f-ubank').addEventListener('input', function(e){
+    state.unadjBank = e.target.value===''? null : parseFloat(e.target.value);
+    if(state.items.length) renderResults();
+  });
+
+  // ---------------------------------------------------------------
+  // INIT — open in a realistic working state with example data
+  // ---------------------------------------------------------------
+  state.bankRows = exampleBankRows();
+  state.bookRows = exampleBookRows();
+  state.unadjBook = 257447.91;
+  document.getElementById('f-ubook').value = '257447.91';
+  renderBankTable();
+  seedManualExamples(); renderManualTable();
+  renderBookTable();
+  seedPriorManualExamples(); renderPriorManualTable();
+  renderPriorPreview();
+
+})();
+</script>
