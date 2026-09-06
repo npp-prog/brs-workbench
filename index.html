@@ -1,7 +1,7 @@
 <title>BRS Workbench</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&family=Inconsolata:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
@@ -27,7 +27,7 @@
     --radius: 10px;
     --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
     --font-body: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-mono: "Inconsolata", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -336,8 +336,8 @@
         <div class="field"><label for="f-branch">Branch</label><input id="f-branch" value="Kabankalan City"></div>
         <div class="field span2"><label for="f-acct">Account no.</label><input id="f-acct" value="1172-1020-22" style="font-family:var(--font-mono)"></div>
 
-        <div class="field span2"><label for="f-prep">Prepared by</label><input id="f-prep" value="DEMI ROSE G. TAN"></div>
-        <div class="field span2"><label for="f-cert">Certified correct by</label><input id="f-cert" value="NEIL P. PRIOLO, CPA"></div>
+        <div class="field span2"><label for="f-prep">Prepared by</label><input id="f-prep" placeholder="Name of preparer"></div>
+        <div class="field span2"><label for="f-cert">Certified correct by</label><input id="f-cert" placeholder="Name of certifying officer"></div>
 
         <div class="field span2"><label for="f-ubook">Unadjusted book balance (per general ledger)</label><input id="f-ubook" type="number" step="0.01" style="font-family:var(--font-mono)"></div>
         <div class="field span2"><label for="f-ubank">Unadjusted bank balance <span style="text-transform:none">(auto-fills from statement)</span></label><input id="f-ubank" type="number" step="0.01" style="font-family:var(--font-mono)"></div>
@@ -387,67 +387,71 @@
     </div>
   </section>
 
-  <!-- STEP 3 -->
+  <!-- STEP 3: BANK STATEMENT -->
   <section class="block">
     <div class="block-head">
-      <span class="step-no">3</span><h2>Bank statement &amp; book records</h2>
-      <span class="sub">Upload the exports for this account and this month</span>
+      <span class="step-no">3</span><h2>Bank statement</h2>
+      <span class="sub">Upload the bank export for this account and this month</span>
     </div>
 
-    <div class="twocol">
-      <!-- BANK PANEL -->
-      <div class="card" id="bank-panel">
-        <p class="panel-title">Bank statement</p>
-        <p class="panel-desc">Columns expected: Date, Description, Debit, Credit, Balance, Cheque Number — the format your bank export already uses.</p>
-        <label class="dropzone" id="bank-drop">
+    <div class="card" id="bank-panel">
+      <p class="panel-title">Bank statement</p>
+      <p class="panel-desc">Columns expected: Date, Description, Debit, Credit, Balance, Cheque Number — the format your bank export already uses.</p>
+      <label class="dropzone" id="bank-drop">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+        <span class="dz-text"><b>Click to upload</b> or drag an .xlsx / .csv file here</span>
+        <input type="file" id="bank-file" accept=".xlsx,.xls,.csv">
+      </label>
+      <div class="rowtools">
+        <button class="btn small" id="bank-example">Load example data</button>
+        <button class="btn small ghost" id="bank-clear">Clear</button>
+        <span class="pill example" id="bank-pill" style="margin-left:auto">example</span>
+      </div>
+      <div class="tablewrap"><table class="data" id="bank-table"><thead></thead><tbody></tbody></table></div>
+      <div class="tblhead-actions"><span class="count" id="bank-count"></span><span class="count num" id="bank-endbal"></span></div>
+    </div>
+  </section>
+
+  <!-- STEP 4: BOOK RECORDS -->
+  <section class="block">
+    <div class="block-head">
+      <span class="step-no">4</span><h2>Book records</h2>
+      <span class="sub">Upload or enter this account's ledger for this month</span>
+    </div>
+
+    <div class="card" id="book-panel">
+      <p class="panel-title">Book records</p>
+      <p class="panel-desc">Your account ledger export (TransDate / TransType / ReferenceNumber / Payee / Debit / Credit), a WP working paper, or a simple register.</p>
+      <div class="modebar">
+        <button class="mode-btn active" data-mode="upload">Upload file</button>
+        <button class="mode-btn" data-mode="manual">Enter manually</button>
+      </div>
+
+      <div id="book-upload-mode">
+        <label class="dropzone" id="book-drop">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
-          <span class="dz-text"><b>Click to upload</b> or drag an .xlsx / .csv file here</span>
-          <input type="file" id="bank-file" accept=".xlsx,.xls,.csv">
+          <span class="dz-text"><b>Click to upload</b> your ledger export, WP working paper, or register (.xlsx / .csv)</span>
+          <input type="file" id="book-file" accept=".xlsx,.xls,.csv">
         </label>
         <div class="rowtools">
-          <button class="btn small" id="bank-example">Load example data</button>
-          <button class="btn small ghost" id="bank-clear">Clear</button>
-          <span class="pill example" id="bank-pill" style="margin-left:auto">example</span>
+          <button class="btn small" id="book-example">Load example data</button>
+          <button class="btn small ghost" id="book-clear">Clear</button>
+          <span class="pill example" id="book-pill" style="margin-left:auto">example</span>
         </div>
-        <div class="tablewrap"><table class="data" id="bank-table"><thead></thead><tbody></tbody></table></div>
-        <div class="tblhead-actions"><span class="count" id="bank-count"></span><span class="count num" id="bank-endbal"></span></div>
       </div>
 
-      <!-- BOOK PANEL -->
-      <div class="card" id="book-panel">
-        <p class="panel-title">Book records</p>
-        <p class="panel-desc">Your account ledger export (TransDate / TransType / ReferenceNumber / Payee / Debit / Credit), a WP working paper, or a simple register.</p>
-        <div class="modebar">
-          <button class="mode-btn active" data-mode="upload">Upload file</button>
-          <button class="mode-btn" data-mode="manual">Enter manually</button>
+      <div id="book-manual-mode" style="display:none">
+        <div class="tablewrap" style="max-height:none">
+          <table class="manual" id="book-manual-table">
+            <thead><tr><th style="width:110px">Date</th><th style="width:110px">Reference no.</th><th>Payee / description</th><th style="width:100px">Debit</th><th style="width:100px">Credit</th><th style="width:24px"></th></tr></thead>
+            <tbody id="book-manual-body"></tbody>
+          </table>
         </div>
-
-        <div id="book-upload-mode">
-          <label class="dropzone" id="book-drop">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
-            <span class="dz-text"><b>Click to upload</b> your ledger export, WP working paper, or register (.xlsx / .csv)</span>
-            <input type="file" id="book-file" accept=".xlsx,.xls,.csv">
-          </label>
-          <div class="rowtools">
-            <button class="btn small" id="book-example">Load example data</button>
-            <button class="btn small ghost" id="book-clear">Clear</button>
-            <span class="pill example" id="book-pill" style="margin-left:auto">example</span>
-          </div>
-        </div>
-
-        <div id="book-manual-mode" style="display:none">
-          <div class="tablewrap" style="max-height:none">
-            <table class="manual" id="book-manual-table">
-              <thead><tr><th style="width:110px">Date</th><th style="width:150px">Type</th><th style="width:110px">Reference no.</th><th>Payee / description</th><th style="width:110px">Amount</th><th style="width:24px"></th></tr></thead>
-              <tbody id="book-manual-body"></tbody>
-            </table>
-          </div>
-          <div class="rowtools"><button class="btn small" id="book-addrow">+ Add row</button></div>
-        </div>
-
-        <div class="tablewrap" id="book-preview-wrap"><table class="data" id="book-table"><thead></thead><tbody></tbody></table></div>
-        <div class="tblhead-actions"><span class="count" id="book-count"></span></div>
+        <div class="rowtools"><button class="btn small" id="book-addrow">+ Add row</button></div>
       </div>
+
+      <div class="tablewrap" id="book-preview-wrap"><table class="data" id="book-table"><thead></thead><tbody></tbody></table></div>
+      <div class="tblhead-actions"><span class="count" id="book-count"></span></div>
     </div>
 
     <div class="runbar">
@@ -455,10 +459,10 @@
     </div>
   </section>
 
-  <!-- STEP 3: RESULTS -->
+  <!-- STEP 5: RESULTS -->
   <section class="block" id="results-block" style="display:none">
     <div class="block-head">
-      <span class="step-no">4</span><h2>Reconciling items</h2>
+      <span class="step-no">5</span><h2>Reconciling items</h2>
       <span class="sub">Auto-matched by reference no., batched ADA/deposit groups, then amount clusters · edit, exclude, or add items freely</span>
     </div>
     <div id="cat-groups"></div>
@@ -483,7 +487,7 @@
   <!-- STEP 4: EXPORT -->
   <section class="block" id="export-block" style="display:none">
     <div class="block-head">
-      <span class="step-no">5</span><h2>Export</h2>
+      <span class="step-no">6</span><h2>Export</h2>
     </div>
     <div class="card exportcard">
       <div class="info">Generates two sheets — <b>BR_<span id="exp-tag1"></span></b> (statement) and <b>S_<span id="exp-tag2"></span></b> (schedules) — in the layout of your existing workbook, ready to paste in or send as-is.</div>
@@ -783,31 +787,45 @@
         var lPayee = colIndexByKeyword(lh,['payee','name']);
         var lDebit = colIndexByKeyword(lh,['debit']);
         var lCredit = colIndexByKeyword(lh,['credit']);
+        var lBal = colIndexByKeyword(lh,['balance']);
         if(lDate>-1 && lDebit>-1 && lCredit>-1){
-          var ledgerOut=[], opening=null, runDebit=0, runCredit=0;
+          var ledgerOut=[], opening=null, runDebit=0, runCredit=0, lastBal=null;
           for(var lr=lhIdx+1;lr<rows.length;lr++){
             var lrow=rows[lr]; if(!lrow) continue;
             var ld = lrow[lDate]; if(!ld) continue;
             var debit = parseFloat(lrow[lDebit])||0;
             var credit = parseFloat(lrow[lCredit])||0;
+            var rowBal = lBal>-1? parseFloat(lrow[lBal]) : NaN;
+            rowBal = isNaN(rowBal)? null : rowBal;
             var ttype = (lType>-1 && lrow[lType])? String(lrow[lType]).trim():'';
             var payee = (lPayee>-1 && lrow[lPayee])? String(lrow[lPayee]):'';
             if(/^BB$/i.test(ttype) || /beginning balance/i.test(payee)){
-              opening = debit - credit; continue;
+              opening = rowBal!=null? rowBal : (debit - credit); continue;
             }
             if(!debit && !credit) continue;
             runDebit += debit; runCredit += credit;
+            if(rowBal!=null) lastBal = rowBal;
             ledgerOut.push({date:excelDateToJS(ld), type: credit>0?'check':'deposit',
-              ref: lRef>-1? String(lrow[lRef]==null? '':lrow[lRef]) : '', name:payee, amount: credit>0? credit : debit});
+              ref: lRef>-1? String(lrow[lRef]==null? '':lrow[lRef]) : '', name:payee, amount: credit>0? credit : debit,
+              balance: rowBal});
           }
           if(ledgerOut.length){
-            state.bookRows = ledgerOut; state.bookIsExample = false; renderBookTable();
-            if(opening!=null){
-              var ending = round2(opening + runDebit - runCredit);
+            // Ledger exports list oldest-first; flip to newest-first so the
+            // preview matches the bank table's convention (and so the running
+            // Balance column can anchor row 0 to the ending balance).
+            ledgerOut.reverse();
+            state.bookRows = ledgerOut; state.bookIsExample = false;
+            // Prefer the ledger's own Balance column for the ending figure — it's
+            // the exact value as of the last transaction, no Beginning-Balance
+            // row required. Fall back to opening + net debits/credits otherwise.
+            var ending = lastBal!=null? lastBal : (opening!=null? round2(opening + runDebit - runCredit) : null);
+            if(ending!=null){
               state.unadjBook = ending;
               document.getElementById('f-ubook').value = ending.toFixed(2);
-              toast('Loaded '+ledgerOut.length+' ledger entries — book balance auto-computed from Beginning Balance.');
+              renderBookTable();
+              toast('Loaded '+ledgerOut.length+' ledger entries — book balance auto-filled from '+(lastBal!=null? "the ledger's Balance column.":'Beginning Balance.'));
             } else {
+              renderBookTable();
               toast('Loaded '+ledgerOut.length+' ledger entries.');
             }
             return;
@@ -1006,28 +1024,54 @@
     document.getElementById('bank-count').textContent = rows.length+' transaction'+(rows.length===1?'':'s');
     var last = latestBalanceRow(rows);
     document.getElementById('bank-endbal').textContent = (last && last.balance!=null)? 'Latest balance: '+fmt(last.balance) : '';
-    document.getElementById('bank-pill').textContent = state.bankIsExample? 'example':'loaded';
-    document.getElementById('bank-pill').className = 'pill '+(state.bankIsExample?'example':'loaded');
+    document.getElementById('bank-pill').textContent = rows.length? (state.bankIsExample? 'example':'loaded') : 'empty';
+    document.getElementById('bank-pill').className = 'pill '+(rows.length? (state.bankIsExample?'example':'loaded') : '');
     if(last && last.balance!=null){
       state.unadjBank = last.balance;
       document.getElementById('f-ubank').value = last.balance.toFixed(2);
     }
   }
 
+  // Running balance: book rows are displayed newest-first (same convention as
+  // the bank table), so the balance immediately after row 0 is the period's
+  // ending (unadjusted) book balance if the user has entered it — each older
+  // row's balance is then found by undoing the row above it. Left blank when
+  // no unadjusted book balance is on hand, rather than showing a guess.
+  function bookRunningBalances(rows){
+    var out = new Array(rows.length);
+    var known = (state.unadjBook!=null && !isNaN(state.unadjBook));
+    var running = known? state.unadjBook : null;
+    for(var i=0;i<rows.length;i++){
+      // A row carrying its own balance (read straight from a ledger export's
+      // Balance column) is authoritative — resync the running total to it.
+      if(rows[i].balance!=null && !isNaN(rows[i].balance)) running = rows[i].balance;
+      out[i] = running;
+      if(running!=null){
+        var eff = rows[i].type==='deposit'? rows[i].amount : -rows[i].amount;
+        running = round2(running - eff);
+      }
+    }
+    return out;
+  }
   function renderBookTable(){
     var t = document.getElementById('book-table');
     var rows = state.bookRows;
-    t.querySelector('thead').innerHTML = '<tr><th>Date</th><th>Type</th><th>Reference</th><th>Payee / description</th><th class="num">Amount</th></tr>';
+    t.querySelector('thead').innerHTML = '<tr><th>Date</th><th>Type</th><th>Reference</th><th>Payee / description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr>';
     var tb = t.querySelector('tbody'); tb.innerHTML='';
-    rows.slice(0,300).forEach(function(r){
+    var balances = bookRunningBalances(rows);
+    rows.slice(0,300).forEach(function(r,i){
       var tr=document.createElement('tr'); if(state.bookIsExample) tr.className='example';
+      var debit = r.type==='deposit'? r.amount : 0;
+      var credit = r.type==='check'? r.amount : 0;
+      var bal = balances[i];
       tr.innerHTML = '<td>'+fmtDate(r.date)+'</td><td>'+(r.type==='deposit'?'Deposit':'Check / ADA')+'</td><td>'+escapeHtml(r.ref||'')+'</td>'+
-        '<td>'+escapeHtml(r.name||'')+'</td><td class="num">'+fmt(r.amount)+'</td>';
+        '<td>'+escapeHtml(r.name||'')+'</td><td class="num">'+(debit? fmt(debit):'')+'</td>'+
+        '<td class="num">'+(credit? fmt(credit):'')+'</td><td class="num">'+(bal!=null? fmt(bal):'')+'</td>';
       tb.appendChild(tr);
     });
     document.getElementById('book-count').textContent = rows.length+' record'+(rows.length===1?'':'s');
-    document.getElementById('book-pill').textContent = state.bookIsExample? 'example':'loaded';
-    document.getElementById('book-pill').className = 'pill '+(state.bookIsExample?'example':'loaded');
+    document.getElementById('book-pill').textContent = rows.length? (state.bookIsExample? 'example':'loaded') : 'empty';
+    document.getElementById('book-pill').className = 'pill '+(rows.length? (state.bookIsExample?'example':'loaded') : '');
     var wrap = document.getElementById('book-preview-wrap');
     wrap.style.display = (state.bookMode==='upload')? '' : 'none';
   }
@@ -1037,9 +1081,12 @@
   // ---------------------------------------------------------------
   // MANUAL BOOK ENTRY TABLE
   // ---------------------------------------------------------------
-  var manualRows = []; // {id,date,type,ref,name,amount, example}
+  var manualRows = []; // {id,date,ref,name,debit,credit, example}
   function seedManualExamples(){
-    manualRows = exampleBookRows().map(function(r){ return Object.assign({id:uid(), example:true}, r, {date: fmtDateInput(r.date)}); });
+    manualRows = exampleBookRows().map(function(r){
+      return {id:uid(), example:true, date: fmtDateInput(r.date), ref:r.ref, name:r.name,
+        debit: r.type==='deposit'? r.amount : '', credit: r.type==='check'? r.amount : ''};
+    });
   }
   function fmtDateInput(d){
     if(!d) return '';
@@ -1054,16 +1101,25 @@
       var tr=document.createElement('tr'); if(r.example) tr.className='example';
       tr.innerHTML =
         '<td><input type="date" value="'+r.date+'" data-f="date"></td>'+
-        '<td><select data-f="type"><option value="check"'+(r.type==='check'?' selected':'')+'>Check / ADA</option><option value="deposit"'+(r.type==='deposit'?' selected':'')+'>Deposit</option></select></td>'+
         '<td><input type="text" value="'+escapeHtml(r.ref||'')+'" data-f="ref" placeholder="No."></td>'+
         '<td><input type="text" value="'+escapeHtml(r.name||'')+'" data-f="name" placeholder="Payee / description"></td>'+
-        '<td class="amt"><input type="number" step="0.01" value="'+(r.amount||'')+'" data-f="amount" placeholder="0.00"></td>'+
+        '<td class="amt"><input type="number" step="0.01" value="'+(r.debit||'')+'" data-f="debit" placeholder="0.00"></td>'+
+        '<td class="amt"><input type="number" step="0.01" value="'+(r.credit||'')+'" data-f="credit" placeholder="0.00"></td>'+
         '<td><button class="xbtn" title="Delete row">×</button></td>';
       tr.querySelectorAll('[data-f]').forEach(function(inp){
         inp.addEventListener('input', function(){
           if(r.example){ r.example=false; tr.classList.remove('example'); }
           var f=inp.getAttribute('data-f');
-          r[f] = f==='amount'? parseFloat(inp.value)||0 : inp.value;
+          if(f==='debit' || f==='credit'){
+            r[f] = parseFloat(inp.value)||0;
+            // A ledger line is either a debit or a credit, not both — clear the other side.
+            if(r[f]){
+              var other = f==='debit'? 'credit':'debit';
+              if(r[other]){ r[other]=''; var oi=tr.querySelector('[data-f="'+other+'"]'); if(oi) oi.value=''; }
+            }
+          } else {
+            r[f] = inp.value;
+          }
           syncManualToBookRows();
         });
       });
@@ -1075,14 +1131,17 @@
     });
   }
   function syncManualToBookRows(){
-    var real = manualRows.filter(function(r){ return !r.example && r.date && r.amount; });
-    state.bookRows = real.map(function(r){ return {date:new Date(r.date+'T00:00:00'), type:r.type, ref:r.ref, name:r.name, amount:Math.abs(r.amount)}; });
+    var real = manualRows.filter(function(r){ return !r.example && r.date && (r.debit || r.credit); });
+    state.bookRows = real.map(function(r){
+      var isDep = !!r.debit;
+      return {date:new Date(r.date+'T00:00:00'), type: isDep? 'deposit':'check', ref:r.ref, name:r.name, amount: Math.abs(isDep? r.debit : r.credit)};
+    });
     state.bookIsExample = real.length===0;
     document.getElementById('book-count').textContent = state.bookRows.length+' record'+(state.bookRows.length===1?'':'s');
   }
 
   document.getElementById('book-addrow').addEventListener('click', function(){
-    manualRows.push({id:uid(), date:'', type:'check', ref:'', name:'', amount:'', example:false});
+    manualRows.push({id:uid(), date:'', ref:'', name:'', debit:'', credit:'', example:false});
     renderManualTable();
   });
 
@@ -1654,6 +1713,7 @@
 
   document.getElementById('f-ubook').addEventListener('input', function(e){
     state.unadjBook = e.target.value===''? null : parseFloat(e.target.value);
+    renderBookTable();
     if(state.items.length) renderResults();
   });
   document.getElementById('f-ubank').addEventListener('input', function(e){
@@ -1662,16 +1722,14 @@
   });
 
   // ---------------------------------------------------------------
-  // INIT — open in a realistic working state with example data
+  // INIT — start blank. Nothing pre-filled except the account-picker
+  // default; "Load example data" in each panel still shows a worked
+  // demo on request.
   // ---------------------------------------------------------------
-  state.bankRows = exampleBankRows();
-  state.bookRows = exampleBookRows();
-  state.unadjBook = 257447.91;
-  document.getElementById('f-ubook').value = '257447.91';
   renderBankTable();
-  seedManualExamples(); renderManualTable();
+  renderManualTable();
   renderBookTable();
-  seedPriorManualExamples(); renderPriorManualTable();
+  renderPriorManualTable();
   renderPriorPreview();
 
 })();
