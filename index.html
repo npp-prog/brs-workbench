@@ -663,7 +663,7 @@
   };
 
   var CATS = [
-    {key:'checks',    label:'Checks Issued not taken up by Bank',              side:'bank', sign:-1},
+    {key:'checks',    label:'Checks/ADA Issued not taken up by Bank',          side:'bank', sign:-1},
     {key:'deposits',  label:'Deposits not taken up by Bank',                    side:'bank', sign:+1},
     {key:'chkoverunder', label:'Checks Issued — Overstated / Understated by Books', side:'book', sign:+1},
     {key:'deposoverunder', label:'Deposits — Overstated / Understated by Books', side:'book', sign:+1},
@@ -703,7 +703,7 @@
   // Illustrates the prior-period carryforward: one outstanding check that
   // finally clears this month (matched off, tier 0) and one deposit in transit
   // that clears too, plus one stale check that's still outstanding and gets
-  // carried into this month's "Checks Issued not taken up by Bank" automatically.
+  // carried into this month's "Checks/ADA Issued not taken up by Bank" automatically.
   function examplePriorOutstandingRows(){
     return [
       {date:new Date(2025,11,18), cat:'checks', ref:'1522399', name:'OLD VENDOR CORP', amount:6800.00},
@@ -1715,7 +1715,7 @@
       ['Particular','','','','Book','Bank','Explanatory Note'],
       ['Unadjusted Balances','','','',uBook,uBank,''],
       ['Reconciling Items'],
-      ['','Checks Issued not taken up by','','', '', catAmt('checks')],
+      ['','Checks/ADA Issued not taken up by','','', '', catAmt('checks')],
       ['','Check Issued Overstated/Understated by','','', catAmt('chkoverunder'),''],
       ['','Deposits not taken up by','','', '', catAmt('deposits')],
       ['','Deposit Overstated/Understated by','','', catAmt('deposoverunder'),''],
