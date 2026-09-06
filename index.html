@@ -187,6 +187,12 @@
   .modebar button.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
 
   .rowtools{ display:flex; gap:8px; margin:10px 0 4px; flex-wrap:wrap; }
+  .matchrow{ display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  .matchrow select{
+    flex:1 1 260px; min-width:200px; font:inherit; font-size:12.8px; padding:8px 10px;
+    border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink);
+  }
+  .matchrow .mm-x{ color:var(--ink-dim); font-weight:700; }
   .btn{
     font:inherit; font-size:12.8px; font-weight:600; padding:7px 14px; border-radius:7px;
     border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); cursor:pointer;
@@ -467,6 +473,17 @@
     </div>
     <div id="cat-groups"></div>
 
+    <div class="card" id="manual-match-card" style="display:none">
+      <p class="panel-title">Manually match remaining items</p>
+      <p class="panel-desc">Couldn't be auto-matched — maybe a typo in the reference number, or a slightly different amount. If you can confirm a book item and a bank item are really the same transaction, match them here: both drop out of the reconciling items above and move into the Reconciled Balances proof schedule instead.</p>
+      <div class="matchrow">
+        <select id="mm-book"></select>
+        <span class="mm-x">↔</span>
+        <select id="mm-bank"></select>
+        <button class="btn small primary" id="mm-confirm">Match</button>
+      </div>
+    </div>
+
     <div class="balances" id="balances-block">
       <div class="col" id="book-col">
         <h4>Adjusted book balance</h4>
@@ -490,7 +507,7 @@
       <span class="step-no">6</span><h2>Export</h2>
     </div>
     <div class="card exportcard">
-      <div class="info">Generates two sheets — <b>BR_<span id="exp-tag1"></span></b> (statement) and <b>S_<span id="exp-tag2"></span></b> (schedules) — in the layout of your existing workbook, ready to paste in or send as-is.</div>
+      <div class="info">Generates three sheets — <b>BR_<span id="exp-tag1"></span></b> (statement), <b>S_<span id="exp-tag2"></span></b> (schedules), and <b>Reconciled Balances</b> (every matched item — book date, bank date, reference no., amount per book, amount per bank, and the proof between them) — in the layout of your existing workbook, ready to paste in or send as-is.</div>
       <button class="btn primary" id="export-btn">Download BRS workbook (.xlsx)</button>
     </div>
   </section>
@@ -604,6 +621,14 @@
     var mm=(dt.getMonth()+1), dd=dt.getDate(), yy=dt.getFullYear();
     return mm+'/'+dd+'/'+yy;
   }
+  // Formats a list of dates as a single cell value ("1/5/2026" for one date,
+  // "1/5/2026; 1/6/2026" for several) — used when a book batch was cleared
+  // by more than one bank line (a split deposit or a subset-sum match).
+  function joinDates(dates){
+    var seen = {}, out = [];
+    dates.forEach(function(d){ var s=fmtDate(d); if(s && !seen[s]){ seen[s]=true; out.push(s); } });
+    return out.join('; ');
+  }
   function normRef(s){ return (s===null||s===undefined)? '' : String(s).trim().replace(/^0+(?=\d)/,'').toUpperCase(); }
   function uid(){ return Math.random().toString(36).slice(2,10); }
   // Statement export order varies (newest-first is common but not guaranteed) — find the
@@ -632,6 +657,7 @@
     priorIsExample: false,
     items: [],          // reconciling item objects after matching
     matchedCount: 0,
+    matchedPairs: [],   // {bookDate,bankDate,ref,amtBook,amtBank,proof} — cleanly tied transactions
     unadjBook: null,
     unadjBank: null
   };
@@ -1337,6 +1363,13 @@
 
     var items = [];
     var matchedBook = 0, matchedBank = 0;
+    // Every transaction the engine successfully ties between book and bank —
+    // for the "Reconciled Balances" proof schedule (book date, bank date,
+    // reference, amount per book, amount per bank, and the proof of the two).
+    var matchedPairs = [];
+    function pushMatch(bookDate, bankDate, ref, amtBook, amtBank, note){
+      matchedPairs.push({bookDate:bookDate, bankDate:bankDate, ref:ref||'', amtBook:round2(amtBook), amtBank:round2(amtBank), proof:round2(amtBook-amtBank), note:note||''});
+    }
 
     // TIER 0: prior-period reconciling items, across all 6 categories. None
     // of these appear in this month's book export (they were already
@@ -1368,6 +1401,7 @@
         }
         if(cand){
           cand._used = true; matchedBank++; priorCleared++;
+          pushMatch(p.date, cand.date, p.ref, p.amount, bankSideAmt(cand,isDisb));
         } else {
           items.push({id:uid(), cat: p.cat, date:p.date, ref:p.ref, name:p.name,
             amount: isDisb? -p.amount : p.amount, side:'bank', include:true,
@@ -1401,6 +1435,7 @@
           date:b.date, ref:b.ref, name:(b.name||k.desc||'')+' — '+word+' by books',
           amount: adj, side:'book', include:true, remarks:'Book '+fmt(b.amount)+' vs bank '+fmt(bAmt)});
       }
+      pushMatch(b.date, k.date, b.ref, b.amount, bAmt);
     });
 
     // Group whatever's left by shared reference number (ADA batch / deposit slip);
@@ -1427,6 +1462,7 @@
       if(cand){
         u.forEach(function(x){ x._used=true; matchedBook++; });
         cand._used = true; matchedBank++;
+        pushMatch(u._date, cand.date, u[0].ref, total, bankSideAmt(cand,isDisb));
         return;
       }
 
@@ -1442,7 +1478,10 @@
       var res = subsetSumMatch(Math.round(total*100), cents, capN);
       if(res){
         u.forEach(function(x){ x._used=true; matchedBook++; });
-        res.forEach(function(idx){ pool[idx]._used=true; matchedBank++; });
+        var hitRows = res.map(function(idx){ pool[idx]._used=true; matchedBank++; return pool[idx]; });
+        var bankTotal = round2(hitRows.reduce(function(s,k){ return s+bankSideAmt(k,isDisb); },0));
+        var bankDates = hitRows.map(function(k){ return k.date; });
+        pushMatch(u._date, joinDates(bankDates), u[0].ref, total, bankTotal);
       }
     });
 
@@ -1467,6 +1506,7 @@
     state.items = items;
     state.matchedCount = matchedBook;
     state.matchedBankCount = matchedBank;
+    state.matchedPairs = matchedPairs;
 
     document.getElementById('results-block').style.display='';
     document.getElementById('export-block').style.display='';
@@ -1590,10 +1630,57 @@
     var tag = (monthSel.value||'').slice(0,3)+document.getElementById('f-year').value;
     document.getElementById('exp-tag1').textContent = tag;
     document.getElementById('exp-tag2').textContent = tag;
+
+    renderManualMatch();
   }
   function line(label, val, muted){
     return '<div class="line"'+(muted?' style="color:var(--ink-dim)"':'')+'><span>'+label+'</span><span class="num">'+fmt(val)+'</span></div>';
   }
+
+  // ---------------------------------------------------------------
+  // MANUAL MATCHING — for items the auto-matcher couldn't tie together
+  // (a reference-no. typo, a slightly different amount, etc.). The user
+  // picks one leftover "book" item (outstanding check/deposit) and one
+  // leftover "bank" item (unrecorded memo) and confirms they're really the
+  // same transaction; both then move out of the reconciling-items lists
+  // and into state.matchedPairs, same as an automatic match.
+  function manualMatchPools(){
+    return {
+      bookPool: state.items.filter(function(it){ return it.side==='bank' && (it.cat==='checks'||it.cat==='deposits'); }),
+      bankPool: state.items.filter(function(it){ return it.side==='book' && it.cat==='memos'; })
+    };
+  }
+  function renderManualMatch(){
+    var card = document.getElementById('manual-match-card');
+    var pools = manualMatchPools();
+    if(!pools.bookPool.length || !pools.bankPool.length){ card.style.display='none'; return; }
+    card.style.display='';
+    function optLabel(it){
+      return fmtDate(it.date)+' · '+(it.ref||'no ref')+' · '+(it.name||'').slice(0,30)+' · '+fmt(Math.abs(it.amount));
+    }
+    var bookSel = document.getElementById('mm-book'), bankSel = document.getElementById('mm-bank');
+    var prevBook = bookSel.value, prevBank = bankSel.value;
+    bookSel.innerHTML = pools.bookPool.map(function(it){ return '<option value="'+it.id+'">'+escapeHtml(optLabel(it))+'</option>'; }).join('');
+    bankSel.innerHTML = pools.bankPool.map(function(it){ return '<option value="'+it.id+'">'+escapeHtml(optLabel(it))+'</option>'; }).join('');
+    if(pools.bookPool.some(function(it){return it.id===prevBook;})) bookSel.value = prevBook;
+    if(pools.bankPool.some(function(it){return it.id===prevBank;})) bankSel.value = prevBank;
+  }
+  document.getElementById('mm-confirm').addEventListener('click', function(){
+    var pools = manualMatchPools();
+    var bookId = document.getElementById('mm-book').value, bankId = document.getElementById('mm-bank').value;
+    var bookIt = pools.bookPool.find(function(it){return it.id===bookId;});
+    var bankIt = pools.bankPool.find(function(it){return it.id===bankId;});
+    if(!bookIt || !bankIt) return;
+    state.items = state.items.filter(function(it){ return it.id!==bookIt.id && it.id!==bankIt.id; });
+    var amtBook = Math.abs(bookIt.amount), amtBank = Math.abs(bankIt.amount);
+    state.matchedPairs = (state.matchedPairs||[]).concat([{
+      bookDate: bookIt.date, bankDate: bankIt.date, ref: bookIt.ref||bankIt.ref||'',
+      amtBook: round2(amtBook), amtBank: round2(amtBank), proof: round2(amtBook-amtBank),
+      note:'Manually matched'
+    }]);
+    renderResults();
+    toast('Matched manually — moved to Reconciled Balances.');
+  });
 
   // ---------------------------------------------------------------
   // EXPORT (.xlsx via downloads capability)
@@ -1641,7 +1728,7 @@
     var wsBR = XLSX.utils.aoa_to_sheet(br);
     wsBR['!cols'] = [{wch:4},{wch:32},{wch:4},{wch:26},{wch:16},{wch:16},{wch:24}];
 
-    var sch = [['Schedules'],['Bank Reconciliation Month:','',month+' '+year],[]];
+    var sch = [['Schedules'],['Bank Reconciliation Month:','',month+' '+year],['Account No.:','',acct],[]];
     CATS.forEach(function(cat){
       sch.push([cat.label]);
       sch.push(['Date','Reference No','Name','Amount','Remarks']);
@@ -1654,11 +1741,41 @@
     var wsS = XLSX.utils.aoa_to_sheet(sch);
     wsS['!cols'] = [{wch:12},{wch:16},{wch:40},{wch:14},{wch:30}];
 
+    // Reconciled Balances — proof schedule: every transaction the matching
+    // engine actually tied between book and bank, side by side, so someone
+    // reviewing the file can verify each one rather than just trusting the
+    // final totals. Proof = Amount per Book − Amount per Bank; 0.00 confirms
+    // a clean match, a nonzero figure flags one already carried to the
+    // Overstated/Understated schedule as an adjustment.
+    function cellDate(v){ return (v instanceof Date)? fmtDate(v) : (v||''); }
+    var pairs = (state.matchedPairs||[]).slice().sort(function(a,b){
+      var da = (a.bookDate instanceof Date)? a.bookDate : 0;
+      var db = (b.bookDate instanceof Date)? b.bookDate : 0;
+      return db - da;
+    });
+    var rec = [
+      [org],[' RECONCILED ITEMS'],[' For the Month of '+month+' '+year+' — Account No. '+acct],
+      [],
+      ['Book Date','Bank Date','Reference No.','Amount per Book','Amount per Bank','Proof (Book − Bank)','Notes']
+    ];
+    if(!pairs.length){ rec.push(['No items were matched between book and bank this period.','','','','','','']); }
+    pairs.forEach(function(p){
+      rec.push([cellDate(p.bookDate), cellDate(p.bankDate), p.ref||'', p.amtBook, p.amtBank, p.proof, p.note||'']);
+    });
+    var totBook = round2(pairs.reduce(function(s,p){return s+p.amtBook;},0));
+    var totBank = round2(pairs.reduce(function(s,p){return s+p.amtBank;},0));
+    var totProof = round2(pairs.reduce(function(s,p){return s+p.proof;},0));
+    rec.push([]);
+    rec.push(['','','Total', totBook, totBank, totProof, '']);
+    var wsRec = XLSX.utils.aoa_to_sheet(rec);
+    wsRec['!cols'] = [{wch:14},{wch:20},{wch:20},{wch:16},{wch:16},{wch:18},{wch:20}];
+
     var wb = XLSX.utils.book_new();
     var tag = 'BR_'+(month||'').slice(0,3)+year;
     var tag2 = 'S_'+(month||'').slice(0,3)+year;
     XLSX.utils.book_append_sheet(wb, wsBR, tag.slice(0,31));
     XLSX.utils.book_append_sheet(wb, wsS, tag2.slice(0,31));
+    XLSX.utils.book_append_sheet(wb, wsRec, 'Reconciled Balances');
     return {wb:wb, filename:'BRS_'+(acct||'account')+'_'+monthTag(month,year)+'.xlsx'};
   }
 
@@ -1695,8 +1812,11 @@
   // ---------------------------------------------------------------
   function saveHeaderPrefs(){
     try{
+      // Signer names (f-prep/f-cert) are deliberately excluded — a name
+      // typed for one month's reconciliation should never resurface as a
+      // "prefilled" default the next time the page opens.
       var o={};
-      ['f-account-picker','f-org','f-fund','f-bank','f-branch','f-acct','f-prep','f-cert'].forEach(function(id){ o[id]=document.getElementById(id).value; });
+      ['f-account-picker','f-org','f-fund','f-bank','f-branch','f-acct'].forEach(function(id){ o[id]=document.getElementById(id).value; });
       localStorage.setItem('brsw-header', JSON.stringify(o));
     }catch(e){}
   }
@@ -1705,6 +1825,7 @@
       var raw = localStorage.getItem('brsw-header');
       if(!raw) return;
       var o = JSON.parse(raw);
+      delete o['f-prep']; delete o['f-cert']; // ignore any signer name saved by an older version
       Object.keys(o).forEach(function(id){ var el=document.getElementById(id); if(el) el.value=o[id]; });
     }catch(e){}
   }
