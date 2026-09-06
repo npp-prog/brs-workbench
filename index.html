@@ -629,6 +629,13 @@
     dates.forEach(function(d){ var s=fmtDate(d); if(s && !seen[s]){ seen[s]=true; out.push(s); } });
     return out.join('; ');
   }
+  // Same idea as joinDates, for the rare case a book batch was cleared by
+  // more than one bank line, each with its own reference no.
+  function joinRefs(refs){
+    var seen = {}, out = [];
+    refs.forEach(function(r){ var s=(r==null?'':String(r)).trim(); if(s && !seen[s]){ seen[s]=true; out.push(s); } });
+    return out.join('; ');
+  }
   function normRef(s){ return (s===null||s===undefined)? '' : String(s).trim().replace(/^0+(?=\d)/,'').toUpperCase(); }
   function uid(){ return Math.random().toString(36).slice(2,10); }
   // Statement export order varies (newest-first is common but not guaranteed) — find the
@@ -657,7 +664,7 @@
     priorIsExample: false,
     items: [],          // reconciling item objects after matching
     matchedCount: 0,
-    matchedPairs: [],   // {bookDate,bankDate,ref,amtBook,amtBank,proof} — cleanly tied transactions
+    matchedPairs: [],   // {bookDate,bankDate,bookRef,bankRef,amtBook,amtBank,proof,note} — cleanly tied transactions
     unadjBook: null,
     unadjBank: null
   };
@@ -665,7 +672,7 @@
   var CATS = [
     {key:'checks',    label:'Checks/ADA Issued not taken up by Bank',          side:'bank', sign:-1},
     {key:'deposits',  label:'Deposits not taken up by Bank',                    side:'bank', sign:+1},
-    {key:'chkoverunder', label:'Checks Issued — Overstated / Understated by Books', side:'book', sign:+1},
+    {key:'chkoverunder', label:'Checks/ADA Issued — Overstated / Understated by Books', side:'book', sign:+1},
     {key:'deposoverunder', label:'Deposits — Overstated / Understated by Books', side:'book', sign:+1},
     {key:'memos',     label:'Bank Debit/Credit Memos not taken up by the LGU',  side:'book', sign:+1},
     {key:'other',     label:'Other Reconciling Items',                          side:'book', sign:+1}
@@ -1365,10 +1372,14 @@
     var matchedBook = 0, matchedBank = 0;
     // Every transaction the engine successfully ties between book and bank —
     // for the "Reconciled Balances" proof schedule (book date, bank date,
-    // reference, amount per book, amount per bank, and the proof of the two).
+    // book/bank reference, amount per book, amount per bank, and the proof
+    // of the two). Book and bank reference are kept separate since they
+    // often aren't literally identical text (leading zeros, a batch no. on
+    // one side vs a cheque no. on the other) even when they mean the same
+    // reference.
     var matchedPairs = [];
-    function pushMatch(bookDate, bankDate, ref, amtBook, amtBank, note){
-      matchedPairs.push({bookDate:bookDate, bankDate:bankDate, ref:ref||'', amtBook:round2(amtBook), amtBank:round2(amtBank), proof:round2(amtBook-amtBank), note:note||''});
+    function pushMatch(bookDate, bankDate, bookRef, bankRef, amtBook, amtBank, note){
+      matchedPairs.push({bookDate:bookDate, bankDate:bankDate, bookRef:bookRef||'', bankRef:bankRef||'', amtBook:round2(amtBook), amtBank:round2(amtBank), proof:round2(amtBook-amtBank), note:note||''});
     }
 
     // TIER 0: prior-period reconciling items, across all 6 categories. None
@@ -1401,7 +1412,7 @@
         }
         if(cand){
           cand._used = true; matchedBank++; priorCleared++;
-          pushMatch(p.date, cand.date, p.ref, p.amount, bankSideAmt(cand,isDisb));
+          pushMatch(p.date, cand.date, p.ref, cand.ref, p.amount, bankSideAmt(cand,isDisb));
         } else {
           items.push({id:uid(), cat: p.cat, date:p.date, ref:p.ref, name:p.name,
             amount: isDisb? -p.amount : p.amount, side:'bank', include:true,
@@ -1435,7 +1446,7 @@
           date:b.date, ref:b.ref, name:(b.name||k.desc||'')+' — '+word+' by books',
           amount: adj, side:'book', include:true, remarks:'Book '+fmt(b.amount)+' vs bank '+fmt(bAmt)});
       }
-      pushMatch(b.date, k.date, b.ref, b.amount, bAmt);
+      pushMatch(b.date, k.date, b.ref, k.ref, b.amount, bAmt);
     });
 
     // Group whatever's left by shared reference number (ADA batch / deposit slip);
@@ -1462,7 +1473,7 @@
       if(cand){
         u.forEach(function(x){ x._used=true; matchedBook++; });
         cand._used = true; matchedBank++;
-        pushMatch(u._date, cand.date, u[0].ref, total, bankSideAmt(cand,isDisb));
+        pushMatch(u._date, cand.date, u[0].ref, cand.ref, total, bankSideAmt(cand,isDisb));
         return;
       }
 
@@ -1481,7 +1492,8 @@
         var hitRows = res.map(function(idx){ pool[idx]._used=true; matchedBank++; return pool[idx]; });
         var bankTotal = round2(hitRows.reduce(function(s,k){ return s+bankSideAmt(k,isDisb); },0));
         var bankDates = hitRows.map(function(k){ return k.date; });
-        pushMatch(u._date, joinDates(bankDates), u[0].ref, total, bankTotal);
+        var bankRefs = hitRows.map(function(k){ return k.ref; });
+        pushMatch(u._date, joinDates(bankDates), u[0].ref, joinRefs(bankRefs), total, bankTotal);
       }
     });
 
@@ -1673,8 +1685,23 @@
     if(!bookIt || !bankIt) return;
     state.items = state.items.filter(function(it){ return it.id!==bookIt.id && it.id!==bankIt.id; });
     var amtBook = Math.abs(bookIt.amount), amtBank = Math.abs(bankIt.amount);
+    var isDisb = bookIt.cat==='checks';
+
+    // If the two sides don't carry the same amount, it's still a real match
+    // (same reference/transaction) but a genuine over/understatement — carry
+    // that remainder into the same over/understated schedule an automatic
+    // reference match with a mismatched amount would use, exactly like tier 1.
+    if(Math.abs(amtBook-amtBank) >= 0.01){
+      var diff = round2(amtBank - amtBook);
+      var adj = isDisb? round2(amtBook-amtBank) : round2(amtBank-amtBook);
+      var word = diff>0? 'Understated':'Overstated';
+      state.items.push({id:uid(), cat: isDisb?'chkoverunder':'deposoverunder',
+        date:bookIt.date, ref:bookIt.ref||bankIt.ref||'', name:(bookIt.name||bankIt.name||'')+' — '+word+' by books',
+        amount: adj, side:'book', include:true, remarks:'Book '+fmt(amtBook)+' vs bank '+fmt(amtBank)+' (manually matched)'});
+    }
+
     state.matchedPairs = (state.matchedPairs||[]).concat([{
-      bookDate: bookIt.date, bankDate: bankIt.date, ref: bookIt.ref||bankIt.ref||'',
+      bookDate: bookIt.date, bankDate: bankIt.date, bookRef: bookIt.ref||'', bankRef: bankIt.ref||'',
       amtBook: round2(amtBook), amtBank: round2(amtBank), proof: round2(amtBook-amtBank),
       note:'Manually matched'
     }]);
@@ -1716,7 +1743,7 @@
       ['Unadjusted Balances','','','',uBook,uBank,''],
       ['Reconciling Items'],
       ['','Checks/ADA Issued not taken up by','','', '', catAmt('checks')],
-      ['','Check Issued Overstated/Understated by','','', catAmt('chkoverunder'),''],
+      ['','Checks/ADA Issued Overstated/Understated by','','', catAmt('chkoverunder'),''],
       ['','Deposits not taken up by','','', '', catAmt('deposits')],
       ['','Deposit Overstated/Understated by','','', catAmt('deposoverunder'),''],
       ['','Bank Debit/Credit Memos, not taken up by the LGU','','', catAmt('memos'),''],
@@ -1756,19 +1783,19 @@
     var rec = [
       [org],[' RECONCILED ITEMS'],[' For the Month of '+month+' '+year+' — Account No. '+acct],
       [],
-      ['Book Date','Bank Date','Reference No.','Amount per Book','Amount per Bank','Proof (Book − Bank)','Notes']
+      ['Book Date','Bank Date','Book Reference No.','Bank Reference No.','Amount per Book','Amount per Bank','Proof (Book − Bank)','Notes']
     ];
-    if(!pairs.length){ rec.push(['No items were matched between book and bank this period.','','','','','','']); }
+    if(!pairs.length){ rec.push(['No items were matched between book and bank this period.','','','','','','','']); }
     pairs.forEach(function(p){
-      rec.push([cellDate(p.bookDate), cellDate(p.bankDate), p.ref||'', p.amtBook, p.amtBank, p.proof, p.note||'']);
+      rec.push([cellDate(p.bookDate), cellDate(p.bankDate), p.bookRef||'', p.bankRef||'', p.amtBook, p.amtBank, p.proof, p.note||'']);
     });
     var totBook = round2(pairs.reduce(function(s,p){return s+p.amtBook;},0));
     var totBank = round2(pairs.reduce(function(s,p){return s+p.amtBank;},0));
     var totProof = round2(pairs.reduce(function(s,p){return s+p.proof;},0));
     rec.push([]);
-    rec.push(['','','Total', totBook, totBank, totProof, '']);
+    rec.push(['','','','Total', totBook, totBank, totProof, '']);
     var wsRec = XLSX.utils.aoa_to_sheet(rec);
-    wsRec['!cols'] = [{wch:14},{wch:20},{wch:20},{wch:16},{wch:16},{wch:18},{wch:20}];
+    wsRec['!cols'] = [{wch:14},{wch:14},{wch:20},{wch:20},{wch:16},{wch:16},{wch:18},{wch:20}];
 
     var wb = XLSX.utils.book_new();
     var tag = 'BR_'+(month||'').slice(0,3)+year;
