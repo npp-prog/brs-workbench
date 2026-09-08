@@ -187,12 +187,27 @@
   .modebar button.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
 
   .rowtools{ display:flex; gap:8px; margin:10px 0 4px; flex-wrap:wrap; }
-  .matchrow{ display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap; }
-  .matchrow select{
-    flex:1 1 260px; min-width:200px; font:inherit; font-size:12.8px; padding:8px 10px;
-    border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink);
+  .matchrow{ display:flex; align-items:center; gap:14px; margin-top:10px; flex-wrap:wrap; }
+  .matchrow .mm-x{ color:var(--ink-dim); font-weight:700; align-self:center; }
+  .mm-col{ flex:1 1 300px; min-width:240px; display:flex; flex-direction:column; }
+  .mm-col-head{
+    display:flex; justify-content:space-between; align-items:baseline; font-size:11px;
+    text-transform:uppercase; letter-spacing:.05em; color:var(--ink-dim); margin-bottom:6px;
   }
-  .matchrow .mm-x{ color:var(--ink-dim); font-weight:700; }
+  .mm-col-head .num{ font-family:var(--font-mono); font-weight:700; color:var(--ink); }
+  .mm-list{
+    max-height:190px; overflow-y:auto; border:1px solid var(--line-strong); border-radius:7px;
+    background:var(--surface);
+  }
+  .mm-list .mm-row{
+    display:flex; align-items:center; gap:8px; padding:7px 10px; font-size:12.6px;
+    border-bottom:1px solid var(--line); cursor:pointer;
+  }
+  .mm-list .mm-row:last-child{ border-bottom:none; }
+  .mm-list .mm-row:hover{ background:var(--surface-2); }
+  .mm-list .mm-row input{ flex:none; }
+  .mm-list .mm-row .mm-amt{ margin-left:auto; font-family:var(--font-mono); white-space:nowrap; padding-left:10px; }
+  .mm-list .mm-empty{ padding:10px; font-size:12.6px; color:var(--ink-dim); }
   .btn{
     font:inherit; font-size:12.8px; font-weight:600; padding:7px 14px; border-radius:7px;
     border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); cursor:pointer;
@@ -475,13 +490,19 @@
 
     <div class="card" id="manual-match-card" style="display:none">
       <p class="panel-title">Manually match remaining items</p>
-      <p class="panel-desc">Couldn't be auto-matched — maybe a typo in the reference number, or a slightly different amount. If you can confirm a book item and a bank item are really the same transaction, match them here: both drop out of the reconciling items above and move into the Reconciled Balances proof schedule instead.</p>
-      <div class="matchrow">
-        <select id="mm-book"></select>
+      <p class="panel-desc">Couldn't be auto-matched — maybe a typo in the reference number, or a slightly different amount. Check off one or more items on each side that together are really the same transaction (a batch of checks vs. one lump debit memo, say) and match them here: everything checked drops out of the reconciling items above and moves into the Reconciled Balances proof schedule instead. Match again as many times as you need.</p>
+      <div class="matchrow" style="align-items:stretch;">
+        <div class="mm-col">
+          <div class="mm-col-head"><span>Book items</span><span class="num" id="mm-book-total"></span></div>
+          <div class="mm-list" id="mm-book-list"></div>
+        </div>
         <span class="mm-x">↔</span>
-        <select id="mm-bank"></select>
-        <button class="btn small primary" id="mm-confirm">Match</button>
+        <div class="mm-col">
+          <div class="mm-col-head"><span>Bank items</span><span class="num" id="mm-bank-total"></span></div>
+          <div class="mm-list" id="mm-bank-list"></div>
+        </div>
       </div>
+      <div class="rowtools"><button class="btn small primary" id="mm-confirm">Match checked items</button></div>
     </div>
 
     <div class="balances" id="balances-block">
@@ -629,6 +650,15 @@
     dates.forEach(function(d){ var s=fmtDate(d); if(s && !seen[s]){ seen[s]=true; out.push(s); } });
     return out.join('; ');
   }
+  // Like joinDates, but hands back the actual Date object when everything
+  // selected shares one date (the common case) instead of a formatted
+  // string — keeps the "Reconciled Balances" sheet's date-based sort and
+  // cell formatting working for the ordinary one-date match.
+  function oneOrJoinDates(dates){
+    var seen = {}, uniq = [];
+    dates.forEach(function(d){ var s=fmtDate(d); if(s && !seen[s]){ seen[s]=true; uniq.push(d); } });
+    return uniq.length===1? uniq[0] : joinDates(dates);
+  }
   // Same idea as joinDates, for the rare case a book batch was cleared by
   // more than one bank line, each with its own reference no.
   function joinRefs(refs){
@@ -637,6 +667,16 @@
     return out.join('; ');
   }
   function normRef(s){ return (s===null||s===undefined)? '' : String(s).trim().replace(/^0+(?=\d)/,'').toUpperCase(); }
+  // True only when BOTH sides actually carry a reference number and those
+  // numbers disagree — e.g. a book check no. 1835881 vs a bank cheque no.
+  // 1835899. A coincidental amount match must never override that: two
+  // different checks for the same peso amount are not the same transaction,
+  // even though a lump/batch match (where one side has no reference at all)
+  // is still allowed to go through on amount alone.
+  function refsConflict(a, b){
+    var na = normRef(a), nb = normRef(b);
+    return !!na && !!nb && na!==nb;
+  }
   function uid(){ return Math.random().toString(36).slice(2,10); }
   // Statement export order varies (newest-first is common but not guaranteed) — find the
   // row with the latest valid date to read the period-end running balance from, rather
@@ -1400,7 +1440,7 @@
         var rn = p.ref? normRef(p.ref) : '';
         var cand = rn? bank.find(function(k){ return !k._used && normRef(k.ref)===rn && Math.abs(bankSideAmt(k,isDisb)-p.amount)<0.01; }) : null;
         if(!cand){
-          var pool = bank.filter(function(k){ return !k._used && Math.abs(bankSideAmt(k,isDisb)-p.amount)<0.01; });
+          var pool = bank.filter(function(k){ return !k._used && Math.abs(bankSideAmt(k,isDisb)-p.amount)<0.01 && !refsConflict(p.ref, k.ref); });
           if(pool.length){
             pool.sort(function(x,y){
               var dx = p.date&&x.date? Math.abs(x.date-p.date):9e15;
@@ -1468,8 +1508,11 @@
     units.forEach(function(u){
       var isDisb = u._isDisb, total = u._total;
 
-      // TIER 2: group/row total == a single unmatched bank row
-      var cand = bank.find(function(k){ return !k._used && bankSideAmt(k,isDisb)>0 && Math.abs(bankSideAmt(k,isDisb)-total)<0.01; });
+      // TIER 2: group/row total == a single unmatched bank row. A bank row
+      // that carries its own reference no. conflicting with this book
+      // item's/group's reference is excluded — a matching peso amount is
+      // not enough to call two differently-numbered checks the same one.
+      var cand = bank.find(function(k){ return !k._used && bankSideAmt(k,isDisb)>0 && Math.abs(bankSideAmt(k,isDisb)-total)<0.01 && !refsConflict(u[0].ref, k.ref); });
       if(cand){
         u.forEach(function(x){ x._used=true; matchedBook++; });
         cand._used = true; matchedBank++;
@@ -1478,7 +1521,8 @@
       }
 
       // TIER 3: group/row total == sum of a subset of nearby unmatched bank rows
-      var pool = bank.filter(function(k){ return !k._used && bankSideAmt(k,isDisb)>0; });
+      // (same reference-conflict guard as tier 2 applies to the candidate pool)
+      var pool = bank.filter(function(k){ return !k._used && bankSideAmt(k,isDisb)>0 && !refsConflict(u[0].ref, k.ref); });
       pool.sort(function(x,y){
         var dx = u._date&&x.date? Math.abs(x.date-u._date):9e15;
         var dy = u._date&&y.date? Math.abs(y.date-u._date):9e15;
@@ -1493,7 +1537,7 @@
         var bankTotal = round2(hitRows.reduce(function(s,k){ return s+bankSideAmt(k,isDisb); },0));
         var bankDates = hitRows.map(function(k){ return k.date; });
         var bankRefs = hitRows.map(function(k){ return k.ref; });
-        pushMatch(u._date, joinDates(bankDates), u[0].ref, joinRefs(bankRefs), total, bankTotal);
+        pushMatch(u._date, oneOrJoinDates(bankDates), u[0].ref, joinRefs(bankRefs), total, bankTotal);
       }
     });
 
@@ -1662,33 +1706,64 @@
       bankPool: state.items.filter(function(it){ return it.side==='book' && it.cat==='memos'; })
     };
   }
+  function mmRowHtml(it){
+    return '<label class="mm-row"><input type="checkbox" data-id="'+it.id+'">'+
+      '<span>'+escapeHtml(fmtDate(it.date)+' · '+(it.ref||'no ref')+' · '+(it.name||'').slice(0,34))+'</span>'+
+      '<span class="mm-amt">'+fmt(Math.abs(it.amount))+'</span></label>';
+  }
+  function mmUpdateTotal(listEl, outEl, pool){
+    var sum = 0;
+    listEl.querySelectorAll('input:checked').forEach(function(cb){
+      var it = pool.find(function(x){return x.id===cb.getAttribute('data-id');});
+      if(it) sum += Math.abs(it.amount);
+    });
+    outEl.textContent = sum? fmt(sum) : '';
+  }
   function renderManualMatch(){
     var card = document.getElementById('manual-match-card');
     var pools = manualMatchPools();
     if(!pools.bookPool.length || !pools.bankPool.length){ card.style.display='none'; return; }
     card.style.display='';
-    function optLabel(it){
-      return fmtDate(it.date)+' · '+(it.ref||'no ref')+' · '+(it.name||'').slice(0,30)+' · '+fmt(Math.abs(it.amount));
-    }
-    var bookSel = document.getElementById('mm-book'), bankSel = document.getElementById('mm-bank');
-    var prevBook = bookSel.value, prevBank = bankSel.value;
-    bookSel.innerHTML = pools.bookPool.map(function(it){ return '<option value="'+it.id+'">'+escapeHtml(optLabel(it))+'</option>'; }).join('');
-    bankSel.innerHTML = pools.bankPool.map(function(it){ return '<option value="'+it.id+'">'+escapeHtml(optLabel(it))+'</option>'; }).join('');
-    if(pools.bookPool.some(function(it){return it.id===prevBook;})) bookSel.value = prevBook;
-    if(pools.bankPool.some(function(it){return it.id===prevBank;})) bankSel.value = prevBank;
+    document.getElementById('mm-book-list').innerHTML = pools.bookPool.map(mmRowHtml).join('');
+    document.getElementById('mm-bank-list').innerHTML = pools.bankPool.map(mmRowHtml).join('');
+    document.getElementById('mm-book-total').textContent = '';
+    document.getElementById('mm-bank-total').textContent = '';
   }
+  // Delegated listeners, attached once — renderManualMatch() only ever
+  // replaces the list contents, so these keep working across re-renders
+  // without piling up duplicate handlers. Each looks up the current pool
+  // fresh so it always matches what's actually on screen.
+  document.getElementById('mm-book-list').addEventListener('change', function(){
+    mmUpdateTotal(this, document.getElementById('mm-book-total'), manualMatchPools().bookPool);
+  });
+  document.getElementById('mm-bank-list').addEventListener('change', function(){
+    mmUpdateTotal(this, document.getElementById('mm-bank-total'), manualMatchPools().bankPool);
+  });
   document.getElementById('mm-confirm').addEventListener('click', function(){
     var pools = manualMatchPools();
-    var bookId = document.getElementById('mm-book').value, bankId = document.getElementById('mm-bank').value;
-    var bookIt = pools.bookPool.find(function(it){return it.id===bookId;});
-    var bankIt = pools.bankPool.find(function(it){return it.id===bankId;});
-    if(!bookIt || !bankIt) return;
-    state.items = state.items.filter(function(it){ return it.id!==bookIt.id && it.id!==bankIt.id; });
-    var amtBook = Math.abs(bookIt.amount), amtBank = Math.abs(bankIt.amount);
-    var isDisb = bookIt.cat==='checks';
+    var bookIds = Array.prototype.map.call(document.querySelectorAll('#mm-book-list input:checked'), function(cb){ return cb.getAttribute('data-id'); });
+    var bankIds = Array.prototype.map.call(document.querySelectorAll('#mm-bank-list input:checked'), function(cb){ return cb.getAttribute('data-id'); });
+    var bookIts = pools.bookPool.filter(function(it){ return bookIds.indexOf(it.id)>-1; });
+    var bankIts = pools.bankPool.filter(function(it){ return bankIds.indexOf(it.id)>-1; });
+    if(!bookIts.length || !bankIts.length){ toast('Check at least one item on each side.'); return; }
+    var cats = {}; bookIts.forEach(function(it){ cats[it.cat]=true; });
+    if(Object.keys(cats).length>1){ toast('Match checks/ADA items and deposits separately — checked book items must be all one type.'); return; }
+    var isDisb = bookIts[0].cat==='checks';
 
-    // If the two sides don't carry the same amount, it's still a real match
-    // (same reference/transaction) but a genuine over/understatement — carry
+    var bookIdSet = {}; bookIts.forEach(function(it){ bookIdSet[it.id]=true; });
+    var bankIdSet = {}; bankIts.forEach(function(it){ bankIdSet[it.id]=true; });
+    state.items = state.items.filter(function(it){ return !bookIdSet[it.id] && !bankIdSet[it.id]; });
+
+    var amtBook = round2(bookIts.reduce(function(s,it){ return s+Math.abs(it.amount); },0));
+    var amtBank = round2(bankIts.reduce(function(s,it){ return s+Math.abs(it.amount); },0));
+    var bookDate = oneOrJoinDates(bookIts.map(function(it){ return it.date; }));
+    var bankDate = oneOrJoinDates(bankIts.map(function(it){ return it.date; }));
+    var bookRef = joinRefs(bookIts.map(function(it){ return it.ref; }));
+    var bankRef = joinRefs(bankIts.map(function(it){ return it.ref; }));
+    var repName = bookIts[0].name || bankIts[0].name || '';
+
+    // If the two sides don't carry the same total, it's still a real match
+    // (same batch/transaction) but a genuine over/understatement — carry
     // that remainder into the same over/understated schedule an automatic
     // reference match with a mismatched amount would use, exactly like tier 1.
     if(Math.abs(amtBook-amtBank) >= 0.01){
@@ -1696,17 +1771,18 @@
       var adj = isDisb? round2(amtBook-amtBank) : round2(amtBank-amtBook);
       var word = diff>0? 'Understated':'Overstated';
       state.items.push({id:uid(), cat: isDisb?'chkoverunder':'deposoverunder',
-        date:bookIt.date, ref:bookIt.ref||bankIt.ref||'', name:(bookIt.name||bankIt.name||'')+' — '+word+' by books',
+        date:bookIts[0].date, ref:bookRef||bankRef, name:repName+' — '+word+' by books',
         amount: adj, side:'book', include:true, remarks:'Book '+fmt(amtBook)+' vs bank '+fmt(amtBank)+' (manually matched)'});
     }
 
+    var count = bookIts.length+bankIts.length;
     state.matchedPairs = (state.matchedPairs||[]).concat([{
-      bookDate: bookIt.date, bankDate: bankIt.date, bookRef: bookIt.ref||'', bankRef: bankIt.ref||'',
-      amtBook: round2(amtBook), amtBank: round2(amtBank), proof: round2(amtBook-amtBank),
-      note:'Manually matched'
+      bookDate: bookDate, bankDate: bankDate, bookRef: bookRef, bankRef: bankRef,
+      amtBook: amtBook, amtBank: amtBank, proof: round2(amtBook-amtBank),
+      note:'Manually matched'+(count>2? ' ('+bookIts.length+' book · '+bankIts.length+' bank)':'')
     }]);
     renderResults();
-    toast('Matched manually — moved to Reconciled Balances.');
+    toast('Matched manually — '+count+' item'+(count===1?'':'s')+' moved to Reconciled Balances.');
   });
 
   // ---------------------------------------------------------------
